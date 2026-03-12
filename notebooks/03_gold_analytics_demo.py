@@ -1,0 +1,1 @@
+print("Gold analytics placeholder")
