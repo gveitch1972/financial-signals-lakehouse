@@ -27,5 +27,16 @@ sync:
     - sql/**
 
 
+resources:
+  jobs:
+    bootstrap_environment:
+      name: bootstrap-environment
+      tasks:
+        - task_key: bootstrap_sql
+          spark_python_task:
+            python_file: src/bootstrap/bootstrap_env.py
+          existing_cluster_id: ${var.dev_cluster_id}
+
+
 
 

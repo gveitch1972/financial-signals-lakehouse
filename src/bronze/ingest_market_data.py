@@ -1,6 +1,6 @@
 import requests
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, concat_ws, current_timestamp, lit, to_timestamp
+from pyspark.sql.functions import col, concat_ws, current_timestamp, lit, split, to_date, to_timestamp
 from pyspark.sql.types import (
     StructType, StructField, StringType, DoubleType, LongType
 )
@@ -10,9 +10,8 @@ from src.common.audit import log_pipeline_run
 
 import os 
 
-print("MARKER: ingest-market-v3")
-print("INGEST FILE:", __file__ if "__file__" in globals() else "no __file__")
-print("INGEST CWD:", os.getcwd())
+print("Starting bronze_market_ingest")
+print("cwd:", os.getcwd())
 
 STOOQ_URL = "https://stooq.com/q/l/"
 
@@ -51,13 +50,15 @@ def fetch_market_data_spark(spark, symbols):
     return (
         df.withColumnRenamed("Symbol", "symbol")
           .withColumnRenamed("Close", "price")
-          .withColumn("currency", lit("USD"))
+          .withColumn("currency", split(col("symbol"), r"\.").getItem(1))
           .withColumn(
               "market_time",
               to_timestamp(concat_ws(" ", col("Date"), col("Time")), "yyyy-MM-dd HH:mm:ss")
           )
           .withColumn("ingest_ts", current_timestamp())
-          .select("symbol", "price", "currency", "market_time", "ingest_ts")
+          .withColumn("_ingest_date", to_date(current_timestamp()))
+          .withColumn("_source", lit("stooq"))
+          .select("symbol", "price", "currency", "market_time", "ingest_ts", "_ingest_date", "_source")
     )
 
 def main():
@@ -71,14 +72,14 @@ def main():
     df.printSchema()
     df.show(truncate=False)
 
-    row_count = df.count()
-
     (
         df.write
           .format("delta")
           .mode("append")
           .saveAsTable(BRONZE_MARKET_RAW)
     )
+
+    row_count = df.count()
 
     log_pipeline_run(
         spark,
