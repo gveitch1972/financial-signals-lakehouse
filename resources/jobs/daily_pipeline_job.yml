@@ -5,26 +5,26 @@ resources:
 
       tasks:
         - task_key: bronze_ingestion
-          job_cluster_key: single_node_cluster
+          existing_cluster_id: 0301-140106-2vpc0rse
           spark_python_task:
-            python_file: ../../notebooks/01_bronze_ingestion_demo.py
+            python_file: ../jobs/run_bronze_ingestion.py
 
         - task_key: silver_transform
-          job_cluster_key: single_node_cluster
+          existing_cluster_id: 0301-140106-2vpc0rse
           depends_on:
             - task_key: bronze_ingestion
           spark_python_task:
             python_file: ../../notebooks/02_silver_transform_demo.py
 
         - task_key: gold_analytics
-          job_cluster_key: single_node_cluster
+          existing_cluster_id: 0301-140106-2vpc0rse
           depends_on:
             - task_key: silver_transform
           spark_python_task:
             python_file: ../../notebooks/03_gold_analytics_demo.py
 
         - task_key: validation_queries
-          job_cluster_key: single_node_cluster
+          existing_cluster_id: 0301-140106-2vpc0rse
           depends_on:
             - task_key: gold_analytics
           spark_python_task:

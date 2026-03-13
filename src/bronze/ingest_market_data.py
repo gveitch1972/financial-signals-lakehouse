@@ -1,60 +1,83 @@
 import requests
-import pandas as pd
 from pyspark.sql import SparkSession
-from datetime import datetime
+from pyspark.sql.functions import col, concat_ws, current_timestamp, lit, to_timestamp
+from pyspark.sql.types import (
+    StructType, StructField, StringType, DoubleType, LongType
+)
 
 from src.common.config import BRONZE_MARKET_RAW
 from src.common.audit import log_pipeline_run
 
+import os 
 
-API_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
+print("MARKER: ingest-market-v3")
+print("INGEST FILE:", __file__ if "__file__" in globals() else "no __file__")
+print("INGEST CWD:", os.getcwd())
 
+STOOQ_URL = "https://stooq.com/q/l/"
 
-def fetch_market_data(symbols):
-    """
-    Fetch market data from Yahoo Finance public endpoint.
-    """
+raw_schema = StructType([
+    StructField("Symbol", StringType(), True),
+    StructField("Date", StringType(), True),
+    StructField("Time", StringType(), True),
+    StructField("Open", DoubleType(), True),
+    StructField("High", DoubleType(), True),
+    StructField("Low", DoubleType(), True),
+    StructField("Close", DoubleType(), True),
+    StructField("Volume", LongType(), True),
+])
 
-    params = {"symbols": ",".join(symbols)}
+def fetch_market_data_spark(spark, symbols):
+    params = {
+        "s": ",".join(symbols).lower(),
+        "f": "sd2t2ohlcv",
+        "h": "",
+        "e": "csv"
+    }
 
-    r = requests.get(API_URL, params=params)
+    r = requests.get(STOOQ_URL, params=params, timeout=30)
     r.raise_for_status()
 
-    results = r.json()["quoteResponse"]["result"]
+    lines = [x for x in r.text.splitlines() if x.strip()]
+    rdd = spark.sparkContext.parallelize(lines)
 
-    records = []
+    df = (
+        spark.read
+        .option("header", True)
+        .schema(raw_schema)
+        .csv(rdd)
+    )
 
-    for r in results:
-        records.append({
-            "symbol": r.get("symbol"),
-            "price": r.get("regularMarketPrice"),
-            "currency": r.get("currency"),
-            "market_time": datetime.utcfromtimestamp(
-                r.get("regularMarketTime")
-            ),
-            "ingest_ts": datetime.utcnow()
-        })
-
-    return pd.DataFrame(records)
-
+    return (
+        df.withColumnRenamed("Symbol", "symbol")
+          .withColumnRenamed("Close", "price")
+          .withColumn("currency", lit("USD"))
+          .withColumn(
+              "market_time",
+              to_timestamp(concat_ws(" ", col("Date"), col("Time")), "yyyy-MM-dd HH:mm:ss")
+          )
+          .withColumn("ingest_ts", current_timestamp())
+          .select("symbol", "price", "currency", "market_time", "ingest_ts")
+    )
 
 def main():
-
     spark = SparkSession.builder.getOrCreate()
+    symbols = ["SPY.US"]
 
-    symbols = ["SPY", "QQQ", "IWM", "DIA"]
+    print("MARKER: entering main()")
 
-    pdf = fetch_market_data(symbols)
+    df = fetch_market_data_spark(spark, symbols)
 
-    row_count = len(pdf)
+    df.printSchema()
+    df.show(truncate=False)
 
-    df = spark.createDataFrame(pdf)
+    row_count = df.count()
 
     (
         df.write
-        .format("delta")
-        .mode("append")
-        .saveAsTable(BRONZE_MARKET_RAW)
+          .format("delta")
+          .mode("append")
+          .saveAsTable(BRONZE_MARKET_RAW)
     )
 
     log_pipeline_run(
@@ -63,7 +86,6 @@ def main():
         status="SUCCESS",
         row_count=row_count
     )
-
 
 if __name__ == "__main__":
     main()
