@@ -1,0 +1,27 @@
+# TODO
+
+## Done
+- Databricks bundle scaffold and job resources are in place (`databricks.yml`, `resources/`).
+- Bootstrap creates `fin_signals_dev` and `bronze/silver/gold/audit` schemas (`src/bootstrap/bootstrap_env.py`, `sql/001_create_catalog.sql`, `sql/002_create_schemas.sql`).
+- Bronze market ingestion implemented with explicit schema + append Delta write (`src/bronze/ingest_market_data.py`).
+- Audit logging path implemented to `fin_signals_dev.audit.pipeline_runs` (`src/common/audit.py`, `sql/003_create_audit_tables.sql`).
+- Bronze table DDL exists for `market_prices_raw` (`sql/010_create_bronze_tables.sql`).
+
+## Next
+- Implement Silver transformation logic in:
+  - `src/silver/transform_market_data.py`
+  - `src/silver/transform_fx_data.py`
+  - `src/silver/transform_macro_data.py`
+- Define Silver tables in `sql/020_create_silver_tables.sql`.
+- Replace Silver/Gold/validation notebook placeholders with real pipeline logic:
+  - `notebooks/02_silver_transform_demo.py`
+  - `notebooks/03_gold_analytics_demo.py`
+  - `notebooks/99_validation_queries.py`
+- Add tests for Silver quality rules in `src/tests/`.
+
+## Later
+- Implement remaining Bronze ingest modules (`src/bronze/ingest_fx_data.py`, `src/bronze/ingest_macro_data.py`).
+- Implement Gold builders in `src/gold/*.py` and Gold DDL in `sql/030_create_gold_tables.sql`.
+- Strengthen monitoring: freshness checks, expected row-count checks, richer audit messages.
+- Expand runbook/data model docs once Silver/Gold contracts are finalized.
+
