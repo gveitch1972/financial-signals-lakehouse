@@ -55,10 +55,10 @@ def fetch_market_data_spark(spark, symbols):
               "market_time",
               to_timestamp(concat_ws(" ", col("Date"), col("Time")), "yyyy-MM-dd HH:mm:ss")
           )
-          .withColumn("ingest_ts", current_timestamp())
+          .withColumn("ingested_at", current_timestamp())
           .withColumn("_ingest_date", to_date(current_timestamp()))
           .withColumn("_source", lit("stooq"))
-          .select("symbol", "price", "currency", "market_time", "ingest_ts", "_ingest_date", "_source")
+          .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
     )
 
 def main():

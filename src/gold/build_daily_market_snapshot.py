@@ -37,7 +37,7 @@ def build_daily_market_snapshot(spark: SparkSession):
             ).alias("day_change_pct"),
             "currency",
             "market_time",
-            "ingest_ts",
+            "ingested_at",
         )
     )
 

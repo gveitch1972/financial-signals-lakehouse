@@ -46,7 +46,7 @@ def build_macro_indicator_trends(spark: SparkSession):
             "period_change_pct",
             "year_over_year_pct",
             "trend_direction",
-            "ingest_ts",
+            "ingested_at",
         )
     )
 

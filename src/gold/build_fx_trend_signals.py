@@ -11,7 +11,7 @@ def build_fx_trend_signals(spark: SparkSession):
     ordered = Window.partitionBy("currency_pair").orderBy(F.col("rate_date").asc())
 
     result = (
-        fx.withColumn("rate_value", F.col("exchange_rate").cast("double"))
+        fx.withColumn("rate_value", F.col("rate").cast("double"))
         .withColumn("prev_rate", F.lag("rate_value", 1).over(ordered))
         .withColumn("prev_5_rate", F.lag("rate_value", 5).over(ordered))
         .withColumn("daily_change", F.round(F.col("rate_value") - F.col("prev_rate"), 8))
@@ -42,12 +42,12 @@ def build_fx_trend_signals(spark: SparkSession):
             "rate_date",
             "base_currency",
             "quote_currency",
-            F.col("rate_value").alias("exchange_rate"),
+            F.col("rate_value").alias("rate"),
             "daily_change",
             "daily_change_pct",
             "weekly_change_pct",
             "trend_signal",
-            "ingest_ts",
+            "ingested_at",
         )
     )
 
