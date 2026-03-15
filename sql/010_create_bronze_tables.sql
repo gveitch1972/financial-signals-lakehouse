@@ -3,8 +3,8 @@ CREATE TABLE IF NOT EXISTS fin_signals_dev.bronze.market_prices_raw (
     price DOUBLE,
     currency STRING,
     market_time TIMESTAMP,
-    ingest_ts TIMESTAMP,
-    _ingest_date TIMESTAMP,
+    ingested_at TIMESTAMP,
+    _ingest_date DATE,
     _source STRING
 )
 USING DELTA;
