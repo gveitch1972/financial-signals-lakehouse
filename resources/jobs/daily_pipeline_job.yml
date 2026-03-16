@@ -4,15 +4,15 @@ resources:
       name: financial-signals-daily-pipeline
 
       tasks:
-        - task_key: bronze_ingestion
+        - task_key: bronze_price_ingestion
           existing_cluster_id: 0301-140106-2vpc0rse
           spark_python_task:
             python_file: ../jobs/run_bronze_ingestion.py
 
-        - task_key: silver_transform
+        - task_key: silver_price_transform
           existing_cluster_id: 0301-140106-2vpc0rse
           depends_on:
-            - task_key: bronze_ingestion
+            - task_key: bronze_price_ingestion
           spark_python_task:
             python_file: ../jobs/silver_market_prices.py
 
@@ -47,6 +47,7 @@ resources:
           depends_on:
             - task_key: silver_transform
             - task_key: silver_fx_transform
+            - task_key: silver_macro_transform
           spark_python_task:
             python_file: ../jobs/run_gold_analytics.py
 

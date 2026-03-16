@@ -12,6 +12,12 @@ The project is designed to show practical lakehouse engineering patterns:
 - Databricks job orchestration
 - audit logging and validation hooks
 
+Current public-source coverage uses:
+
+- Stooq for market prices
+- a public FX API for FX rates
+- the World Bank Indicators API for macro data
+
 ## Source Of Truth
 
 When repo files disagree, use this order of precedence:

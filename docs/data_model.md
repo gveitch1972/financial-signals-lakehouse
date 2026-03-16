@@ -65,7 +65,7 @@ Current shape from ingestion code:
 
 Notes:
 
-- loaded from the World Bank Data360 API
+- loaded from the World Bank Indicators API
 - raw payload is retained for traceability
 
 ## Silver Tables

@@ -43,7 +43,7 @@ Core naming is centralized in `src/common/config.py` and should be treated as th
 
 - Market prices: Stooq CSV endpoint
 - FX rates: Frankfurter-style public FX API endpoint
-- Macro indicators: World Bank Data360 API
+- Macro indicators: World Bank Indicators API
 
 These integrations are lightweight and intended for demonstration and portfolio-style engineering work rather than production vendor management.
 
