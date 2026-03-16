@@ -1,65 +1,63 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, concat, lit, to_date, current_timestamp
-from delta.tables import DeltaTable
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
 from src.common.config import BRONZE_FX_RAW, SILVER_FX
 
-spark = SparkSession.builder.getOrCreate()
 
-df = spark.read.table(BRONZE_FX_RAW)
+def build_clean_fx_df(spark: SparkSession):
+    bronze = spark.read.table(BRONZE_FX_RAW)
 
-clean = (
-    df
-    .filter(col("rate").isNotNull())
-    .dropDuplicates(["base_currency", "quote_currency", "rate_timestamp"])
-    .withColumn("currency_pair", concat(col("base_currency"), col("quote_currency")))
-    .withColumn("rate", col("rate").cast("decimal(12,5)"))
-    .withColumn("rate_date", to_date(col("rate_timestamp")))
-    .withColumn("source_system", lit("frankfurter"))
-    .withColumn("ingested_at", current_timestamp())
-)
-
-merge_condition = """
-target.base_currency = source.base_currency
-AND target.quote_currency = source.quote_currency
-AND target.rate_timestamp = source.rate_timestamp
-"""
-
-if spark.catalog.tableExists(SILVER_FX):
-    target = DeltaTable.forName(spark, SILVER_FX)
-
-    (
-        target.alias("target")
-        .merge(clean.alias("source"), merge_condition)
-        .whenMatchedUpdate(set={
-            "currency_pair": "source.currency_pair",
-            "rate": "source.rate",
-            "rate_date": "source.rate_date",
-            "source_system": "source.source_system",
-            "ingested_at": "source.ingested_at"        })
-        .whenNotMatchedInsert(values={
-            "currency_pair": "source.currency_pair",
-            "base_currency": "source.base_currency",
-            "quote_currency": "source.quote_currency",
-            "rate": "source.rate",
-            "rate_timestamp": "source.rate_timestamp",
-            "rate_date": "source.rate_date",
-            "source_system": "source.source_system",
-            "ingested_at": "source.ingested_at"        })
-        .execute()
+    typed = (
+        bronze
+        .filter(F.col("base_currency").isNotNull())
+        .filter(F.col("quote_currency").isNotNull())
+        .filter(F.col("rate_timestamp").isNotNull())
+        .filter(F.col("rate").isNotNull())
+        .withColumn("currency_pair", F.concat(F.col("base_currency"), F.col("quote_currency")))
+        .withColumn("rate", F.col("rate").cast("decimal(12,5)"))
+        .withColumn("rate_date", F.to_date(F.col("rate_timestamp")))
+        .withColumn("source_system", F.coalesce(F.col("source_name"), F.lit("frankfurter")))
     )
-else:
+
+    dedupe_window = Window.partitionBy(
+        "base_currency",
+        "quote_currency",
+        "rate_timestamp",
+    ).orderBy(F.col("ingested_at").desc())
+
+    return (
+        typed.withColumn("_rn", F.row_number().over(dedupe_window))
+        .filter(F.col("_rn") == 1)
+        .drop("_rn")
+        .select(
+            "currency_pair",
+            "base_currency",
+            "quote_currency",
+            "rate",
+            "rate_timestamp",
+            "rate_date",
+            "source_system",
+            "ingested_at",
+        )
+    )
+
+
+def main():
+    spark = SparkSession.builder.getOrCreate()
+    clean = build_clean_fx_df(spark)
+
     (
         clean.write
         .format("delta")
-        .mode("append")
+        .mode("overwrite")
+        .option("overwriteSchema", "true")
         .saveAsTable(SILVER_FX)
     )
 
-def main():
-    print("MARKER: entering main()")
     clean.printSchema()
     clean.show(truncate=False)
+
 
 if __name__ == "__main__":
     main()

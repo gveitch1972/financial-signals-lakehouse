@@ -10,9 +10,17 @@ def build_macro_indicator_trends(spark: SparkSession):
     timestamp_column = "ingested_at" if "ingested_at" in macro.columns else "ingest_ts"
 
     ordered = Window.partitionBy("country_code", "indicator_name").orderBy(F.col("observation_date").asc())
+    latest_per_date_window = Window.partitionBy(
+        "country_code",
+        "indicator_name",
+        "observation_date",
+    ).orderBy(F.col(timestamp_column).desc())
 
     result = (
         macro.withColumn("obs_value", F.col("observation_value").cast("double"))
+        .withColumn("_rn", F.row_number().over(latest_per_date_window))
+        .filter(F.col("_rn") == 1)
+        .drop("_rn")
         .withColumn("prev_obs", F.lag("obs_value", 1).over(ordered))
         .withColumn("prev_12_obs", F.lag("obs_value", 12).over(ordered))
         .withColumn("period_change", F.round(F.col("obs_value") - F.col("prev_obs"), 6))

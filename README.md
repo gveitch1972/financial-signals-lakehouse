@@ -1,12 +1,12 @@
 # Financial Signals Lakehouse
 
-Databricks Asset Bundles project for a medallion-style financial data pipeline. The repo ingests public market, FX, and macroeconomic datasets into Bronze, standardizes them in Silver, and publishes analytics-ready outputs in Gold, with audit logging kept in a separate schema.
+Databricks Asset Bundles project for a market + FX + macro risk intelligence platform. The repo ingests public financial and macroeconomic datasets into Bronze, standardizes them in Silver, and publishes Gold risk tables that are designed to support treasury, risk, and advisory-style conversations in a live employer demo.
 
 ## What Is In Scope
 
 - Bronze ingestion for market prices, FX rates, and macro indicators
 - Silver transformation jobs for each domain
-- Gold analytics jobs for market snapshot and FX trend signals
+- Gold analytics jobs for market, FX, macro, and cross-signal risk tables
 - Audit logging to `fin_signals_dev.audit`
 - Databricks bundle deployment and job orchestration
 
@@ -14,8 +14,8 @@ Databricks Asset Bundles project for a medallion-style financial data pipeline. 
 
 The repo is beyond bootstrap stage. The daily job defined in `resources/jobs/daily_pipeline_job.yml` currently runs:
 
-1. Market Bronze ingest
-2. Market Silver transform
+1. Price Bronze ingest
+2. Price Silver transform
 3. FX Bronze ingest
 4. FX Silver transform
 5. Macro Bronze ingest
@@ -25,8 +25,8 @@ The repo is beyond bootstrap stage. The daily job defined in `resources/jobs/dai
 
 There are two important implementation notes:
 
-- The gold runner currently executes `daily_market_snapshot` and `fx_trend_signals`.
-- Macro trend and cross-signal gold builders exist in `src/gold/`, but they are not active in the current gold job runner.
+- Market and FX Bronze now support both `snapshot` and `backfill` modes through runtime env vars.
+- A separate historical backfill job is available for one-time history loading before daily refreshes take over.
 
 ## Architecture
 
@@ -42,7 +42,7 @@ Core naming is centralized in `src/common/config.py` and should be treated as th
 ## Public Data Sources
 
 - Market prices: Stooq CSV endpoint
-- FX rates: Frankfurter-style public FX API endpoint
+- FX rates: Frankfurter public FX API
 - Macro indicators: World Bank Indicators API
 
 These integrations are lightweight and intended for demonstration and portfolio-style engineering work rather than production vendor management.
@@ -63,15 +63,24 @@ These integrations are lightweight and intended for demonstration and portfolio-
 
 1. Deploy the bundle: `databricks bundle deploy -t dev`
 2. Run the bootstrap job to create the catalog, schemas, and audit objects
-3. Run the daily pipeline job
-4. Review validation output and audit tables
+3. Run the historical backfill job once if you need deep analytical history
+4. Run the daily pipeline job
+5. Review validation output and audit tables
+
+## Demo Run Order
+
+1. Run bootstrap if the workspace is new.
+2. Run the historical backfill job once.
+3. Run the daily pipeline job.
+4. Open `notebooks/04_employer_demo_walkthrough.py`.
+5. Walk the Gold outputs and consultancy talking points.
 
 The bundle entrypoint is `databricks.yml`. The main orchestrated workflow is `resources/jobs/daily_pipeline_job.yml`.
 
 ## Reality Checks
 
 - Some SQL, notebook, and documentation assets are still thinner than the Python pipeline code.
-- Validation is currently a placeholder runner, not a full quality suite.
+- Validation now performs freshness, duplicate, history-depth, and Gold output checks, with macro freshness and history depth evaluated using lower-frequency thresholds suitable for annual public indicators.
 - If you change Silver or Gold behavior, update orchestration, docs, and any relevant DDL in the same change.
 
 ## Documentation
@@ -81,4 +90,5 @@ The bundle entrypoint is `databricks.yml`. The main orchestrated workflow is `re
 - [Runbook](docs/runbook.md)
 - [Security](docs/security.md)
 - [Project Overview](PROJECT_OVERVIEW.md)
+- [Demo Talk Track](docs/demo_talk_track.md)
 - [Agent Guidance](AGENTS.md)

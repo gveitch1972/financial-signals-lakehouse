@@ -57,7 +57,6 @@ This matters because parts of the repo are more complete than others, and some S
 - Active in runner:
   - `src/gold/build_daily_market_snapshot.py`
   - `src/gold/build_fx_trend_signals.py`
-- Present in repo but not active in current runner:
   - `src/gold/build_macro_indicator_trends.py`
   - `src/gold/build_cross_signal_summary.py`
 
@@ -72,8 +71,8 @@ The main scheduled workflow is `resources/jobs/daily_pipeline_job.yml`.
 
 Current tasks:
 
-1. `bronze_ingestion`
-2. `silver_transform`
+1. `bronze_price_ingestion`
+2. `silver_price_transform`
 3. `bronze_fx_ingestion`
 4. `silver_fx_transform`
 5. `bronze_macro_ingestion`
@@ -83,13 +82,13 @@ Current tasks:
 
 Current dependency shape:
 
-- Market Silver depends on market Bronze
+- Price Silver depends on Price Bronze
 - FX Silver depends on FX Bronze
 - Macro Silver depends on macro Bronze
-- Gold depends on market Silver and FX Silver
+- Gold depends on Price Silver, FX Silver, and Macro Silver
 - Validation depends on Gold
 
-Macro Silver is wired into the job, but current Gold execution does not depend on it because the active gold runner only builds market and FX outputs.
+There is also a separate historical backfill job for price and FX history loading before the daily pipeline is used for incremental refreshes.
 
 ## Data Products
 
@@ -112,13 +111,15 @@ Configured tables in `src/common/config.py`:
   - `fin_signals_dev.audit.pipeline_runs`
   - `fin_signals_dev.audit.ingest_events`
 
-Not every configured table is fully represented in current SQL DDL or active job steps, so treat the config plus job wiring as the operational baseline.
+The operational baseline now includes:
+
+- parameterized Price and FX Bronze ingestion for `snapshot` and `backfill`
+- richer Gold risk metrics for market and FX
+- cross-domain regime classification in `cross_signal_summary`
+- non-placeholder validation checks
 
 ## Known Gaps
 
-- Validation runner is still a placeholder.
-- Gold macro and cross-signal builders are not active in `resources/jobs/run_gold_analytics.py`.
-- Some SQL DDL files do not yet mirror the full set of configured Silver and Gold tables.
 - A duplicate-looking file exists at `src/gold/build_macro_indicator_trends 2nd.py` and should not be treated as the primary implementation.
 
 ## Working Norms

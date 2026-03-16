@@ -70,9 +70,6 @@ Currently active in the gold runner:
 
 - `daily_market_snapshot`
 - `fx_trend_signals`
-
-Present in code but not currently active in the runner:
-
 - `macro_indicator_trends`
 - `cross_signal_summary`
 
@@ -105,8 +102,8 @@ Names are defined in `src/common/config.py` and should be treated as the primary
 
 Current task flow:
 
-1. Market Bronze ingest
-2. Market Silver transform
+1. Price Bronze ingest
+2. Price Silver transform
 3. FX Bronze ingest
 4. FX Silver transform
 5. Macro Bronze ingest
@@ -117,9 +114,10 @@ Current task flow:
 Dependency notes:
 
 - each Silver task depends on its matching Bronze task
-- Gold depends on market Silver and FX Silver
+- Gold depends on Price Silver, FX Silver, and Macro Silver
 - validation depends on Gold
-- macro Silver is currently upstream data preparation, not an active Gold dependency
+
+There is also a separate historical backfill workflow for Price and FX so the daily job can stay in snapshot mode.
 
 ## Audit Pattern
 
@@ -135,5 +133,5 @@ The audit layer is part of the operational control plane and should not be merge
 ## Reality Checks
 
 - Python pipeline code is more complete than some SQL and notebook assets.
-- Validation is still minimal and should not be mistaken for a full production-quality test harness.
+- Validation now performs data freshness, duplicate-key, history-depth, and Gold output checks, with macro freshness assessed against lower-frequency public indicator cadence.
 - Some configured tables exist before their full SQL DDL coverage or active job usage is complete.

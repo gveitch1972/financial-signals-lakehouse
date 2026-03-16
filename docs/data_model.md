@@ -30,6 +30,7 @@ Current shape from ingestion code:
 Notes:
 
 - loaded from the Stooq CSV endpoint
+- supports `snapshot` and `backfill` load modes
 - append-oriented landing table
 
 ### `fin_signals_dev.bronze.fx_rates_raw`
@@ -48,6 +49,7 @@ Current shape from ingestion code:
 Notes:
 
 - loaded from a public FX API endpoint
+- supports `snapshot` and `backfill` load modes
 - append-oriented landing table
 
 ### `fin_signals_dev.bronze.macro_indicators_raw`
@@ -98,7 +100,7 @@ Current behavior:
 - derives `currency_pair`
 - derives `rate_date`
 - stores `source_system`
-- merges into the target table when it already exists
+- overwrites the target table from deduplicated Bronze input
 
 Primary columns in current write path:
 
@@ -145,6 +147,12 @@ Derived fields include:
 - `open_price`
 - `day_change`
 - `day_change_pct`
+- `return_7d_pct`
+- `return_30d_pct`
+- `return_90d_pct`
+- `rolling_30d_volatility`
+- `drawdown_from_90d_high_pct`
+- `stress_flag`
 - `currency`
 - `market_time`
 - `ingested_at`
@@ -163,12 +171,15 @@ Derived fields include:
 - `daily_change`
 - `daily_change_pct`
 - `weekly_change_pct`
+- `return_30d_pct`
+- `rolling_30d_volatility`
 - `trend_signal`
+- `stress_flag`
 - `ingested_at`
 
 ### `fin_signals_dev.gold.macro_indicator_trends`
 
-Implemented in code but not currently active in the gold job runner.
+Currently active.
 
 Derived fields include:
 
@@ -184,9 +195,9 @@ Derived fields include:
 
 ### `fin_signals_dev.gold.cross_signal_summary`
 
-Implemented in code but not currently active in the gold job runner.
+Currently active.
 
-Derived fields aggregate the latest market, FX, and macro trend outputs by date.
+Derived fields aggregate market, FX, and macro trend outputs by date and classify a simple `risk_regime`.
 
 ## Audit Tables
 
@@ -206,5 +217,4 @@ Configured in `src/common/config.py`, but verify active creation and usage befor
 
 ## Notes
 
-- Some SQL DDL files currently lag the implemented Python transformations.
 - When contracts change, update config, code, orchestration, and documentation together.

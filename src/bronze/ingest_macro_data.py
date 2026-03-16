@@ -15,7 +15,7 @@ DEFAULT_INDICATOR_CODES = [
     "NY.GDP.MKTP.CD",
     "FP.CPI.TOTL.ZG",
 ]
-DEFAULT_LOOKBACK_YEARS = int(os.getenv("MACRO_LOOKBACK_YEARS", "10"))
+DEFAULT_LOOKBACK_YEARS = int(os.getenv("MACRO_LOOKBACK_YEARS", "15"))
 DEFAULT_PAGE_SIZE = int(os.getenv("MACRO_PAGE_SIZE", "1000"))
 HTTP_HEADERS = {
     "User-Agent": "financial-signals-lakehouse/1.0",

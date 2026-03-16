@@ -1,43 +1,46 @@
-from pyspark.sql.functions import col
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
-from src.common.config import BRONZE_MARKET_RAW
-from src.common.config import SILVER_MARKET
+from src.common.config import BRONZE_MARKET_RAW, SILVER_MARKET
 
-spark = SparkSession.builder.getOrCreate()
 
-BRONZE_TABLE = "fin_signals_dev.bronze.market_raw"
-SILVER_TABLE = "fin_signals_dev.silver.market_prices"
+def build_clean_market_df(spark: SparkSession):
+    bronze = spark.read.table(BRONZE_MARKET_RAW)
 
-df = spark.read.table(BRONZE_MARKET_RAW)
+    typed = (
+        bronze
+        .withColumn("price", F.col("price").cast("decimal(12,4)"))
+        .filter(F.col("symbol").isNotNull())
+        .filter(F.col("market_time").isNotNull())
+        .filter(F.col("price").isNotNull())
+    )
 
-clean = (
-    df
-    .filter(col("price").isNotNull())
-    .dropDuplicates(["symbol", "market_time"])
-)
+    dedupe_window = Window.partitionBy("symbol", "market_time").orderBy(F.col("ingested_at").desc())
 
-clean = clean.withColumn(
-    "price",
-    col("price").cast("decimal(12,4)")
-)
+    return (
+        typed.withColumn("_rn", F.row_number().over(dedupe_window))
+        .filter(F.col("_rn") == 1)
+        .drop("_rn")
+        .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
+    )
 
-(
-    clean.write
-    .format("delta")
-    .mode("overwrite")
-    .option("overwriteSchema", "true")
-    .saveAsTable(SILVER_MARKET)
-)
 
 def main():
-    print("MARKER: entering main()")
+    spark = SparkSession.builder.getOrCreate()
+    clean = build_clean_market_df(spark)
+
+    (
+        clean.write
+        .format("delta")
+        .mode("overwrite")
+        .option("overwriteSchema", "true")
+        .saveAsTable(SILVER_MARKET)
+    )
 
     clean.printSchema()
     clean.show(truncate=False)
-    
+
 
 if __name__ == "__main__":
     main()
-
-

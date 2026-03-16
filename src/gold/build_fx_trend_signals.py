@@ -9,11 +9,13 @@ def build_fx_trend_signals(spark: SparkSession):
     fx = spark.read.table(SILVER_FX)
 
     ordered = Window.partitionBy("currency_pair").orderBy(F.col("rate_date").asc())
+    rolling_30 = ordered.rowsBetween(-29, 0)
 
     result = (
         fx.withColumn("rate_value", F.col("rate").cast("double"))
         .withColumn("prev_rate", F.lag("rate_value", 1).over(ordered))
         .withColumn("prev_5_rate", F.lag("rate_value", 5).over(ordered))
+        .withColumn("prev_30_rate", F.lag("rate_value", 30).over(ordered))
         .withColumn("daily_change", F.round(F.col("rate_value") - F.col("prev_rate"), 8))
         .withColumn(
             "daily_change_pct",
@@ -32,10 +34,33 @@ def build_fx_trend_signals(spark: SparkSession):
             ),
         )
         .withColumn(
+            "return_30d_pct",
+            F.round(
+                F.when(F.col("prev_30_rate") != 0, ((F.col("rate_value") - F.col("prev_30_rate")) / F.col("prev_30_rate")) * 100)
+                .otherwise(F.lit(None)),
+                6,
+            ),
+        )
+        .withColumn(
+            "rolling_30d_volatility",
+            F.round(F.stddev_samp("daily_change_pct").over(rolling_30) * F.sqrt(F.lit(252.0)), 6),
+        )
+        .withColumn(
             "trend_signal",
             F.when(F.col("daily_change_pct") >= 0.25, F.lit("strengthening"))
             .when(F.col("daily_change_pct") <= -0.25, F.lit("weakening"))
             .otherwise(F.lit("stable")),
+        )
+        .withColumn(
+            "stress_flag",
+            F.coalesce(
+                (
+                (F.abs(F.col("daily_change_pct")) >= F.lit(0.75))
+                | (F.abs(F.col("return_30d_pct")) >= F.lit(2.5))
+                | (F.col("rolling_30d_volatility") >= F.lit(5.0))
+                ),
+                F.lit(False),
+            ),
         )
         .select(
             "currency_pair",
@@ -46,7 +71,10 @@ def build_fx_trend_signals(spark: SparkSession):
             "daily_change",
             "daily_change_pct",
             "weekly_change_pct",
+            "return_30d_pct",
+            "rolling_30d_volatility",
             "trend_signal",
+            "stress_flag",
             "ingested_at",
         )
     )
