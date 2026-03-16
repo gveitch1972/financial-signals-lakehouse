@@ -32,5 +32,5 @@ if __name__ == "__main__":
     
     build_daily_market_snapshot()
     build_fx_trend_signals()
-    #build_macro_indicator_trends()
-    #build_cross_signal_summary()
+    build_macro_indicator_trends()
+    build_cross_signal_summary()
