@@ -1,76 +1,139 @@
 # Architecture
 
 ## Purpose
-This document describes the architecture for the Financial Signals Lakehouse project.
 
-## Design Principles
-- simple, repeatable, governed
-- secure by default
-- clear separation of raw, standardised, and curated data
-- reusable transformation logic
-- auditable pipeline runs
+This document describes the implemented architecture for the Financial Signals Lakehouse repo as it exists in the current Databricks bundle and job wiring.
+
+## Design Goals
+
+- keep ingestion, standardization, and analytics responsibilities separate
+- use simple public data sources to demonstrate practical lakehouse patterns
+- centralize table naming and environment conventions
+- keep audit logging isolated from business-facing schemas
+- make orchestration understandable from the repo without hidden notebook logic
 
 ## High-Level Flow
 
-External Sources
-    ->
-Bronze Ingestion
-    ->
-Silver Standardisation
-    ->
-Gold Analytics
-    ->
-SQL / dashboards / downstream consumers
+Public APIs
+-> Bronze ingestion jobs
+-> Silver standardization jobs
+-> Gold analytical outputs
+-> Validation and audit review
 
-## Layers
+## Medallion Layers
 
 ### Bronze
+
 Purpose:
-- land raw source data with minimal transformation
-- preserve source fidelity
-- support replay and traceability
 
-Characteristics:
-- append-only where possible
-- includes ingestion timestamp
-- includes source name
-- includes batch or run identifier
+- land source records with minimal transformation
+- preserve source fidelity where practical
+- attach ingestion metadata
+- support repeatable append-oriented loads
 
-### Silver
-Purpose:
-- apply schema
-- standardise column names and data types
-- deduplicate and validate
-- conform dates, symbols, and codes
+Implemented domains:
 
-Characteristics:
-- business-ready but not presentation-ready
-- supports joins across source domains
-- enforces quality checks
-
-### Gold
-Purpose:
-- publish curated analytics tables
-- support reporting and consulting-style business questions
-
-Characteristics:
-- denormalised where appropriate
-- metric-driven
-- stable table contracts for downstream users
-
-## Initial Domains
 - market prices
 - FX rates
-- macroeconomic indicators
+- macro indicators
 
-## Audit Layer
-The audit schema stores:
-- pipeline run status
-- row counts
-- start and end timestamps
-- source system name
-- error details where relevant
+Key files:
+
+- `src/bronze/ingest_market_data.py`
+- `src/bronze/ingest_fx_data.py`
+- `src/bronze/ingest_macro_data.py`
+
+### Silver
+
+Purpose:
+
+- enforce data types
+- remove obviously invalid records
+- deduplicate source rows
+- standardize fields for downstream joins and analytics
+
+Implemented domains:
+
+- `src/silver/transform_market_data.py`
+- `src/silver/transform_fx_data.py`
+- `src/silver/transform_macro_data.py`
+
+### Gold
+
+Purpose:
+
+- create reporting- and signal-ready outputs
+- derive change metrics and trend indicators
+- publish stable analytical tables
+
+Currently active in the gold runner:
+
+- `daily_market_snapshot`
+- `fx_trend_signals`
+
+Present in code but not currently active in the runner:
+
+- `macro_indicator_trends`
+- `cross_signal_summary`
+
+## Catalog And Schemas
+
+The current project uses the `fin_signals_dev` catalog with these schemas:
+
+- `bronze`
+- `silver`
+- `gold`
+- `audit`
+
+Names are defined in `src/common/config.py` and should be treated as the primary source of truth.
 
 ## Orchestration
-Initial orchestration will be daily batch.
-Later phases may add more frequent incremental ingestion if justified by source freshness and business value.
+
+### Bundle Entry
+
+- `databricks.yml`
+
+### Bootstrap Job
+
+- Job name: `bootstrap_environment`
+- Purpose: create catalog, schemas, and audit objects
+
+### Daily Pipeline Job
+
+- File: `resources/jobs/daily_pipeline_job.yml`
+- Job name: `financial_signals_daily_pipeline`
+
+Current task flow:
+
+1. Market Bronze ingest
+2. Market Silver transform
+3. FX Bronze ingest
+4. FX Silver transform
+5. Macro Bronze ingest
+6. Macro Silver transform
+7. Gold analytics
+8. Validation
+
+Dependency notes:
+
+- each Silver task depends on its matching Bronze task
+- Gold depends on market Silver and FX Silver
+- validation depends on Gold
+- macro Silver is currently upstream data preparation, not an active Gold dependency
+
+## Audit Pattern
+
+Audit logging is intentionally isolated under `fin_signals_dev.audit`.
+
+Current audit implementation:
+
+- writer: `src/common/audit.py`
+- main table used in code: `fin_signals_dev.audit.pipeline_runs`
+
+The audit layer is part of the operational control plane and should not be merged into Bronze, Silver, or Gold schemas.
+
+## Reality Checks
+
+- Python pipeline code is more complete than some SQL and notebook assets.
+- Validation is still minimal and should not be mistaken for a full production-quality test harness.
+- Some configured tables exist before their full SQL DDL coverage or active job usage is complete.
