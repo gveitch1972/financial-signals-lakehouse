@@ -7,6 +7,7 @@ from src.common.config import GOLD_MACRO_TRENDS, SILVER_MACRO
 
 def build_macro_indicator_trends(spark: SparkSession):
     macro = spark.read.table(SILVER_MACRO)
+    timestamp_column = "ingested_at" if "ingested_at" in macro.columns else "ingest_ts"
 
     ordered = Window.partitionBy("country_code", "indicator_name").orderBy(F.col("observation_date").asc())
 
@@ -46,7 +47,7 @@ def build_macro_indicator_trends(spark: SparkSession):
             "period_change_pct",
             "year_over_year_pct",
             "trend_direction",
-            "ingested_at",
+            F.col(timestamp_column).alias("ingested_at"),
         )
     )
 

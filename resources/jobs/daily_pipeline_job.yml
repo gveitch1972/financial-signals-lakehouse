@@ -49,11 +49,6 @@ resources:
           spark_python_task:
             python_file: ../jobs/run_gold_analytics.py
 
-        - task_key: gold_analytics_only
-          existing_cluster_id: 0301-140106-2vpc0rse
-          spark_python_task:
-            python_file: ../jobs/run_gold_analytics.py
-
         - task_key: validation_queries
           existing_cluster_id: 0301-140106-2vpc0rse
           depends_on:
