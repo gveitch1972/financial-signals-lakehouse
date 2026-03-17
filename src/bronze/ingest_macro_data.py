@@ -49,16 +49,20 @@ def default_date_range(lookback_years=DEFAULT_LOOKBACK_YEARS):
     return f"{start_year}:{end_year}"
 
 
-def build_world_bank_url(page=1, per_page=DEFAULT_PAGE_SIZE, date_range=None):
-    indicator_codes = ";".join(parse_indicator_codes())
+def build_world_bank_url(page=1, per_page=DEFAULT_PAGE_SIZE, date_range=None, indicator_codes=None, include_source=True):
+    indicator_codes = indicator_codes or parse_indicator_codes()
+    indicator_path = ";".join(indicator_codes)
     params = {
         "format": "json",
         "page": page,
         "per_page": per_page,
-        "source": WORLD_BANK_SOURCE_ID,
         "date": date_range or default_date_range(),
     }
-    return f"{WORLD_BANK_API_URL}/{indicator_codes}?{urlencode(params)}"
+    if include_source and WORLD_BANK_SOURCE_ID:
+        params["source"] = WORLD_BANK_SOURCE_ID
+
+    base_url = WORLD_BANK_API_URL.rstrip("/")
+    return f"{base_url}/{indicator_path}?{urlencode(params)}"
 
 
 def fetch_json(url):
@@ -94,18 +98,38 @@ def normalize_world_bank_payload(payload):
     return normalized, page_count
 
 
-def fetch_macro_records():
+def fetch_indicator_records(indicator_code, date_range=None):
     page = 1
     page_count = 1
     records = []
+    include_source = True
 
     while page <= page_count:
-        url = build_world_bank_url(page=page)
-        payload = fetch_json(url)
+        url = build_world_bank_url(
+            page=page,
+            date_range=date_range,
+            indicator_codes=[indicator_code],
+            include_source=include_source,
+        )
+        try:
+            payload = fetch_json(url)
+        except HTTPError as error:
+            if error.code == 400 and include_source:
+                include_source = False
+                continue
+            raise
+
         page_records, page_count = normalize_world_bank_payload(payload)
         records.extend(page_records)
         page += 1
 
+    return records
+
+
+def fetch_macro_records(date_range=None):
+    records = []
+    for indicator_code in parse_indicator_codes():
+        records.extend(fetch_indicator_records(indicator_code, date_range=date_range))
     return records
 
 
