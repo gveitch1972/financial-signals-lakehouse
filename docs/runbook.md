@@ -57,8 +57,11 @@ Current task order:
 - Bronze jobs write fresh rows to their raw tables.
 - Silver jobs complete without schema or type failures.
 - Gold job writes `daily_market_snapshot`, `fx_trend_signals`, `macro_indicator_trends`, and `cross_signal_summary`.
+- Gold job also writes `top_movers_why` for latest-date explainability context.
 - Audit entries show successful pipeline runs with non-null timestamps.
 - Validation step completes with real data quality checks.
+
+For demo storytelling, open `notebooks/06_risk_command_center.py` after the daily job finishes.
 
 ## Failure Handling
 

@@ -1,0 +1,772 @@
+{
+  "name": "n8n Databricks controller",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "poll",
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -288,
+        -160
+      ],
+      "id": "8093811a-da62-43a0-9976-771b7dde3375",
+      "name": "Telegram Trigger",
+      "webhookId": "ac608ece-7081-4683-9bee-77d611db8a4e",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/run",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "69ab59ef-d056-468e-ae0b-1ae0c67c7051"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d0bddca3-b835-41ad-a4a5-066d579d0b78",
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "beaf904e-a859-4b5f-ae99-15583e42c33e",
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/list",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a486d520-6921-430d-b1ff-ed6955651d11",
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -32,
+        -208
+      ],
+      "id": "b91c1bfe-ba52-4d38-be64-506bea8c9dd2",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=Commands:\n/run\n/status\n/list\n/help",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        176
+      ],
+      "id": "5d608a4f-be3b-4e6d-ad20-a14ed6fdb45b",
+      "name": "/help",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=Unknown command: {{$json.message.text}}\nTry /help",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        144
+      ],
+      "id": "761cae5a-5fb5-41a9-9e80-fdf615d15f57",
+      "name": "Default",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        144
+      ],
+      "id": "3e53a0ce-7c69-4ae1-b329-a44d1328c085",
+      "name": "Save chat_id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DATABRICKS_HOST}}/api/2.1/jobs/run-now",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={\n  \"job_id\": {{$json.daily_job_id}}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        336,
+        -320
+      ],
+      "id": "25551241-8ba1-4f7b-8767-b66f663d9673",
+      "name": "Call dBricks Job",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_WITH_DATABRICKS_PAT_CREDENTIAL_ID",
+          "name": "Databricks PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.DATABRICKS_HOST}}/api/2.1/jobs/runs/list",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "active_only",
+              "value": "true"
+            },
+            {
+              "name": "job_id",
+              "value": "={{$json.daily_job_id}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        432,
+        -160
+      ],
+      "id": "3f73f0a2-e39d-49f4-8d3c-e29acf76429d",
+      "name": "Get Status",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_WITH_DATABRICKS_PAT_CREDENTIAL_ID",
+          "name": "Databricks PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "534f4826-1ba6-4b13-95c0-4dedc52f4412",
+              "name": "text",
+              "value": "={{\n  $json.runs && $json.runs.length > 0\n    ? \"Active runs:\\n\" + $json.runs.map(r =>\n        \"- \" + (r.run_name || \"Job\") + \" (\" + r.state.life_cycle_state + \")\"\n      ).join(\"\\n\")\n    : \"No active runs\"\n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        -160
+      ],
+      "id": "9becdce0-99d1-4722-aa2d-126623f9565f",
+      "name": "Format Resp"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Save chat_id4').item.json.chat_id }}",
+        "text": "={{$json.text}}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        -160
+      ],
+      "id": "18379b97-a8e0-4fbb-8125-105d9928a246",
+      "name": "Send Status",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "notesInFlow": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Save chat_id3').item.json.chat_id }}",
+        "text": "=Pipeline triggered ✅\nRun ID: {{$json.run_id}}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        528,
+        -320
+      ],
+      "id": "4e803032-8b32-4131-a364-209522dc17c8",
+      "name": "Send Run ID",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        192
+      ],
+      "id": "43ccfc92-def1-40a7-bfbd-15425a4e2000",
+      "name": "Save chat_id1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        256,
+        16
+      ],
+      "id": "34af026c-4f49-4b33-a79b-3160b23818bc",
+      "name": "Save chat_id2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        -320
+      ],
+      "id": "38e230c2-e0f0-41fb-85c3-ca1f88f1f635",
+      "name": "Save chat_id3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        -160
+      ],
+      "id": "7ee2fdc8-c99b-4ea4-b240-c8fe350063a5",
+      "name": "Save chat_id4"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=/list -> Retrieving active runs",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        16
+      ],
+      "id": "c03806fd-1169-4920-a950-597020cd3914",
+      "name": "/list",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.DATABRICKS_HOST}}/api/2.1/jobs/list",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "financial-signals-daily-pipeline"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        240,
+        -320
+      ],
+      "id": "2bc3fb85-0db4-4bf8-8dae-a674d3d77b27",
+      "name": "Get Daily Job (Run)",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_WITH_DATABRICKS_PAT_CREDENTIAL_ID",
+          "name": "Databricks PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e01df9e8-7bc6-4d7a-8512-59570cc5f6e0",
+              "name": "daily_job_id",
+              "value": "={{$json.jobs && $json.jobs.length > 0 ? $json.jobs[0].job_id : null}}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        432,
+        -320
+      ],
+      "id": "9673451b-fc4f-496a-a298-a6118be42dea",
+      "name": "Set Daily Job ID (Run)"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.DATABRICKS_HOST}}/api/2.1/jobs/list",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "financial-signals-daily-pipeline"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        352,
+        -160
+      ],
+      "id": "df11cdde-1e18-4028-ac0b-03f07e44e1d7",
+      "name": "Get Daily Job (Status)",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_WITH_DATABRICKS_PAT_CREDENTIAL_ID",
+          "name": "Databricks PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2ef03f4d-e7ce-4994-a566-7478bedf709a",
+              "name": "daily_job_id",
+              "value": "={{$json.jobs && $json.jobs.length > 0 ? $json.jobs[0].job_id : null}}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        -272
+      ],
+      "id": "f0f5e021-716d-4fa6-bcd5-f2678f5df9d4",
+      "name": "Set Daily Job ID (Status)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Save chat_id3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save chat_id4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save chat_id2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save chat_id1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save chat_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save chat_id": {
+      "main": [
+        [
+          {
+            "node": "Default",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call dBricks Job": {
+      "main": [
+        [
+          {
+            "node": "Send Run ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Status": {
+      "main": [
+        [
+          {
+            "node": "Format Resp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Resp": {
+      "main": [
+        [
+          {
+            "node": "Send Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Run ID": {
+      "main": [
+        []
+      ]
+    },
+    "Save chat_id3": {
+      "main": [
+        [
+          {
+            "node": "Get Daily Job (Run)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save chat_id4": {
+      "main": [
+        [
+          {
+            "node": "Get Daily Job (Status)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save chat_id2": {
+      "main": [
+        [
+          {
+            "node": "/list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save chat_id1": {
+      "main": [
+        [
+          {
+            "node": "/help",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Daily Job (Run)": {
+      "main": [
+        [
+          {
+            "node": "Set Daily Job ID (Run)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Daily Job ID (Run)": {
+      "main": [
+        [
+          {
+            "node": "Call dBricks Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Daily Job (Status)": {
+      "main": [
+        [
+          {
+            "node": "Set Daily Job ID (Status)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Daily Job ID (Status)": {
+      "main": [
+        [
+          {
+            "node": "Get Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "73c281dd-02cb-4f54-8a80-6b0b4a9162de",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bb431a6c39b6e02007a843611b7ea88b66a22bc18c25b6cf440df2110554b560"
+  },
+  "id": "v8fGlA28jVeIZdIZ",
+  "tags": []
+}

@@ -199,6 +199,22 @@ Currently active.
 
 Derived fields aggregate market, FX, and macro trend outputs by date and classify a simple `risk_regime`.
 
+### `fin_signals_dev.gold.top_movers_why`
+
+Currently active.
+
+Derived fields include:
+
+- `as_of_date`
+- `symbol`
+- `latest_price`
+- `day_change_pct`
+- `return_30d_pct`
+- `stress_flag`
+- `fx_context`
+- `macro_context`
+- `why_summary`
+
 ## Audit Tables
 
 ### `fin_signals_dev.audit.pipeline_runs`

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import socket
+import time
 import uuid
 from datetime import date, datetime, timezone
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -17,11 +20,15 @@ from pyspark.sql.types import (
 )
 
 from src.common.config import BRONZE_FX_RAW
+from src.common.audit import log_pipeline_run
 
 FX_API_BASE_URL = os.getenv("FX_API_BASE_URL", "https://api.frankfurter.app")
 DEFAULT_BASE_CURRENCY = "GBP"
 DEFAULT_QUOTE_CURRENCIES = ["USD", "EUR", "JPY", "CHF"]
 DEFAULT_START_DATE = "2020-01-01"
+DEFAULT_HTTP_TIMEOUT_SECONDS = int(os.getenv("FX_HTTP_TIMEOUT_SECONDS", "60"))
+DEFAULT_HTTP_MAX_RETRIES = int(os.getenv("FX_HTTP_MAX_RETRIES", "3"))
+DEFAULT_HTTP_RETRY_BACKOFF_SECONDS = float(os.getenv("FX_HTTP_RETRY_BACKOFF_SECONDS", "1.5"))
 HTTP_HEADERS = {
     "User-Agent": "financial-signals-lakehouse/1.0",
     "Accept": "application/json",
@@ -76,8 +83,26 @@ def build_request_url(load_mode, base_currency, quote_currencies, start_date, en
 
 def fetch_fx_payload(url: str) -> dict:
     request = Request(url, headers=HTTP_HEADERS)
-    with urlopen(request, timeout=60) as response:
-        return json.loads(response.read().decode("utf-8"))
+    attempts = max(DEFAULT_HTTP_MAX_RETRIES, 1)
+
+    for attempt in range(1, attempts + 1):
+        try:
+            with urlopen(request, timeout=DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError:
+            raise
+        except (TimeoutError, socket.timeout, URLError) as error:
+            is_last_attempt = attempt == attempts
+            if is_last_attempt:
+                raise RuntimeError(
+                    f"Timed out calling FX source after {attempts} attempts: {url}"
+                ) from error
+
+            sleep_seconds = DEFAULT_HTTP_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+            if sleep_seconds > 0:
+                time.sleep(sleep_seconds)
+
+    raise RuntimeError(f"Failed to fetch FX payload from source: {url}")
 
 
 def timestamp_from_date(date_str: str) -> datetime:
@@ -145,6 +170,19 @@ def ensure_table_exists(spark: SparkSession) -> None:
     """)
 
 
+def safe_log_pipeline_run(spark, pipeline_name, status, row_count, message=None):
+    try:
+        log_pipeline_run(
+            spark,
+            pipeline_name=pipeline_name,
+            status=status,
+            row_count=row_count,
+            message=message,
+        )
+    except Exception as error:
+        print(f"Audit logging skipped due to error: {error}")
+
+
 def main() -> None:
     spark = SparkSession.builder.appName("bronze-fx-ingestion").getOrCreate()
     run_id = str(uuid.uuid4())
@@ -153,41 +191,61 @@ def main() -> None:
     base_currency = os.getenv("FX_BASE_CURRENCY", DEFAULT_BASE_CURRENCY).strip().upper()
     quote_currencies = parse_csv_env("FX_QUOTE_CURRENCIES", DEFAULT_QUOTE_CURRENCIES)
     request_url = build_request_url(load_mode, base_currency, quote_currencies, start_date, end_date)
+    pipeline_name = f"bronze_fx_ingest_{load_mode}"
 
-    payload = fetch_fx_payload(request_url)
-    rows = (
-        normalise_backfill_payload(payload, run_id, request_url)
-        if load_mode == "backfill"
-        else normalise_snapshot_payload(payload, run_id, request_url)
-    )
-
-    if not rows:
-        raise RuntimeError("FX ingestion returned zero rows.")
-
-    df = spark.createDataFrame(rows, schema=FX_SCHEMA)
-    ensure_table_exists(spark)
-
-    (
-        df.select(
-            "base_currency",
-            "quote_currency",
-            "rate",
-            "rate_timestamp",
-            "source_name",
-            "source_url",
-            "ingested_at",
-            "run_id",
+    try:
+        payload = fetch_fx_payload(request_url)
+        rows = (
+            normalise_backfill_payload(payload, run_id, request_url)
+            if load_mode == "backfill"
+            else normalise_snapshot_payload(payload, run_id, request_url)
         )
-        .write
-        .format("delta")
-        .mode("append")
-        .saveAsTable(BRONZE_FX_RAW)
-    )
 
-    print(
-        f"Wrote {df.count()} rows to {BRONZE_FX_RAW} "
-        f"with run_id={run_id}, mode={load_mode}, base={base_currency}, quotes={','.join(quote_currencies)}"
-    )
+        if not rows:
+            raise RuntimeError("FX ingestion returned zero rows.")
+
+        df = spark.createDataFrame(rows, schema=FX_SCHEMA)
+        ensure_table_exists(spark)
+
+        (
+            df.select(
+                "base_currency",
+                "quote_currency",
+                "rate",
+                "rate_timestamp",
+                "source_name",
+                "source_url",
+                "ingested_at",
+                "run_id",
+            )
+            .write
+            .format("delta")
+            .mode("append")
+            .saveAsTable(BRONZE_FX_RAW)
+        )
+
+        row_count = df.count()
+        safe_log_pipeline_run(
+            spark,
+            pipeline_name=pipeline_name,
+            status="SUCCESS",
+            row_count=row_count,
+            message=f"base={base_currency};quotes={','.join(quote_currencies)};start={start_date};end={end_date}",
+        )
+
+        print(
+            f"Wrote {row_count} rows to {BRONZE_FX_RAW} "
+            f"with run_id={run_id}, mode={load_mode}, base={base_currency}, quotes={','.join(quote_currencies)}"
+        )
+    except Exception as error:
+        safe_log_pipeline_run(
+            spark,
+            pipeline_name=pipeline_name,
+            status="FAILED",
+            row_count=0,
+            message=str(error),
+        )
+        raise
 
 
 if __name__ == "__main__":

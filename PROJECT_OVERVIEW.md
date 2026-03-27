@@ -106,7 +106,8 @@ Configured tables in `src/common/config.py`:
   - `fin_signals_dev.gold.daily_market_snapshot`
   - `fin_signals_dev.gold.fx_trend_signals`
   - `fin_signals_dev.gold.macro_indicator_trends`
-  - `fin_signals_dev.gold.cross_signal_summary`
+- `fin_signals_dev.gold.cross_signal_summary`
+  - `fin_signals_dev.gold.top_movers_why`
 - Audit:
   - `fin_signals_dev.audit.pipeline_runs`
   - `fin_signals_dev.audit.ingest_events`

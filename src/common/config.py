@@ -27,6 +27,7 @@ GOLD_MARKET_SNAPSHOT = f"{CATALOG}.{GOLD_SCHEMA}.daily_market_snapshot"
 GOLD_FX_TRENDS = f"{CATALOG}.{GOLD_SCHEMA}.fx_trend_signals"
 GOLD_MACRO_TRENDS = f"{CATALOG}.{GOLD_SCHEMA}.macro_indicator_trends"
 GOLD_CROSS_SIGNALS = f"{CATALOG}.{GOLD_SCHEMA}.cross_signal_summary"
+GOLD_TOP_MOVERS_WHY = f"{CATALOG}.{GOLD_SCHEMA}.top_movers_why"
 
 # Audit tables
 AUDIT_PIPELINE_RUNS = f"{CATALOG}.{AUDIT_SCHEMA}.pipeline_runs"

@@ -7,6 +7,7 @@ Databricks Asset Bundles project for a market + FX + macro risk intelligence pla
 - Bronze ingestion for market prices, FX rates, and macro indicators
 - Silver transformation jobs for each domain
 - Gold analytics jobs for market, FX, macro, and cross-signal risk tables
+- Gold explainability output for top movers with cross-domain context
 - Audit logging to `fin_signals_dev.audit`
 - Databricks bundle deployment and job orchestration
 
@@ -73,7 +74,8 @@ These integrations are lightweight and intended for demonstration and portfolio-
 2. Run the historical backfill job once.
 3. Run the daily pipeline job.
 4. Open `notebooks/04_employer_demo_walkthrough.py`.
-5. Walk the Gold outputs and consultancy talking points.
+5. Optionally open `notebooks/06_risk_command_center.py` for dashboard-style storytelling.
+6. Walk the Gold outputs and consultancy talking points.
 
 The bundle entrypoint is `databricks.yml`. The main orchestrated workflow is `resources/jobs/daily_pipeline_job.yml`.
 

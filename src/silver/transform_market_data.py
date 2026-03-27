@@ -2,6 +2,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
+from src.common.audit import log_pipeline_run
 from src.common.config import BRONZE_MARKET_RAW, SILVER_MARKET
 
 
@@ -26,20 +27,52 @@ def build_clean_market_df(spark: SparkSession):
     )
 
 
+def safe_log_pipeline_run(spark, pipeline_name, status, row_count, message=None):
+    try:
+        log_pipeline_run(
+            spark,
+            pipeline_name=pipeline_name,
+            status=status,
+            row_count=row_count,
+            message=message,
+        )
+    except Exception as error:
+        print(f"Audit logging skipped due to error: {error}")
+
+
 def main():
     spark = SparkSession.builder.getOrCreate()
-    clean = build_clean_market_df(spark)
+    try:
+        clean = build_clean_market_df(spark)
 
-    (
-        clean.write
-        .format("delta")
-        .mode("overwrite")
-        .option("overwriteSchema", "true")
-        .saveAsTable(SILVER_MARKET)
-    )
+        (
+            clean.write
+            .format("delta")
+            .mode("overwrite")
+            .option("overwriteSchema", "true")
+            .saveAsTable(SILVER_MARKET)
+        )
 
-    clean.printSchema()
-    clean.show(truncate=False)
+        row_count = clean.count()
+        safe_log_pipeline_run(
+            spark,
+            pipeline_name="silver_market_transform",
+            status="SUCCESS",
+            row_count=row_count,
+            message="silver market transform completed",
+        )
+
+        clean.printSchema()
+        clean.show(truncate=False)
+    except Exception as error:
+        safe_log_pipeline_run(
+            spark,
+            pipeline_name="silver_market_transform",
+            status="FAILED",
+            row_count=0,
+            message=str(error),
+        )
+        raise
 
 
 if __name__ == "__main__":

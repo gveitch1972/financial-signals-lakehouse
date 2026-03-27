@@ -1,7 +1,9 @@
 import json
 import os
+import socket
+import time
 from datetime import datetime, timezone
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -17,6 +19,9 @@ DEFAULT_INDICATOR_CODES = [
 ]
 DEFAULT_LOOKBACK_YEARS = int(os.getenv("MACRO_LOOKBACK_YEARS", "15"))
 DEFAULT_PAGE_SIZE = int(os.getenv("MACRO_PAGE_SIZE", "1000"))
+DEFAULT_HTTP_TIMEOUT_SECONDS = int(os.getenv("MACRO_HTTP_TIMEOUT_SECONDS", "30"))
+DEFAULT_HTTP_MAX_RETRIES = int(os.getenv("MACRO_HTTP_MAX_RETRIES", "3"))
+DEFAULT_HTTP_RETRY_BACKOFF_SECONDS = float(os.getenv("MACRO_HTTP_RETRY_BACKOFF_SECONDS", "1.5"))
 HTTP_HEADERS = {
     "User-Agent": "financial-signals-lakehouse/1.0",
     "Accept": "application/json",
@@ -67,8 +72,24 @@ def build_world_bank_url(page=1, per_page=DEFAULT_PAGE_SIZE, date_range=None, in
 
 def fetch_json(url):
     request = Request(url, headers=HTTP_HEADERS)
-    with urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+    attempts = max(DEFAULT_HTTP_MAX_RETRIES, 1)
+
+    for attempt in range(1, attempts + 1):
+        try:
+            with urlopen(request, timeout=DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError:
+            raise
+        except (TimeoutError, socket.timeout, URLError) as error:
+            is_last_attempt = attempt == attempts
+            if is_last_attempt:
+                raise RuntimeError(
+                    f"Timed out calling macro source after {attempts} attempts: {url}"
+                ) from error
+
+            sleep_seconds = DEFAULT_HTTP_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+            if sleep_seconds > 0:
+                time.sleep(sleep_seconds)
 
 
 def normalize_world_bank_payload(payload):
@@ -99,31 +120,36 @@ def normalize_world_bank_payload(payload):
 
 
 def fetch_indicator_records(indicator_code, date_range=None):
-    page = 1
-    page_count = 1
-    records = []
-    include_source = True
+    def fetch_with_source_mode(include_source):
+        page = 1
+        page_count = 1
+        records = []
 
-    while page <= page_count:
-        url = build_world_bank_url(
-            page=page,
-            date_range=date_range,
-            indicator_codes=[indicator_code],
-            include_source=include_source,
-        )
-        try:
+        while page <= page_count:
+            url = build_world_bank_url(
+                page=page,
+                date_range=date_range,
+                indicator_codes=[indicator_code],
+                include_source=include_source,
+            )
             payload = fetch_json(url)
-        except HTTPError as error:
-            if error.code == 400 and include_source:
-                include_source = False
-                continue
+            page_records, page_count = normalize_world_bank_payload(payload)
+            records.extend(page_records)
+            page += 1
+
+        return records
+
+    try:
+        records = fetch_with_source_mode(include_source=True)
+    except HTTPError as error:
+        if error.code != 400 or not WORLD_BANK_SOURCE_ID:
             raise
+        records = []
 
-        page_records, page_count = normalize_world_bank_payload(payload)
-        records.extend(page_records)
-        page += 1
+    if records or not WORLD_BANK_SOURCE_ID:
+        return records
 
-    return records
+    return fetch_with_source_mode(include_source=False)
 
 
 def fetch_macro_records(date_range=None):
@@ -166,7 +192,22 @@ def main():
     try:
         records = fetch_macro_records()
         if not records:
-            raise RuntimeError("Macro ingestion returned zero records from the World Bank API.")
+            table_exists = spark.catalog.tableExists(BRONZE_MACRO_RAW)
+            historical_count = spark.read.table(BRONZE_MACRO_RAW).limit(1).count() if table_exists else 0
+
+            if historical_count > 0:
+                message = "Macro ingestion returned zero records; existing Bronze macro history retained."
+                safe_log_pipeline_run(
+                    spark,
+                    pipeline_name="bronze_macro_ingest",
+                    status="SUCCESS",
+                    row_count=0,
+                    message=message,
+                )
+                print(message)
+                return
+
+            raise RuntimeError("Macro ingestion returned zero records from the World Bank API and no Bronze history exists.")
 
         df = spark.createDataFrame(records, schema=macro_schema)
 

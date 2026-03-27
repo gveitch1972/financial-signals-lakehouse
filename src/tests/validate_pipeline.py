@@ -10,6 +10,7 @@ from src.common.config import (
     GOLD_FX_TRENDS,
     GOLD_MACRO_TRENDS,
     GOLD_MARKET_SNAPSHOT,
+    GOLD_TOP_MOVERS_WHY,
     SILVER_FX,
     SILVER_MACRO,
     SILVER_MARKET,
@@ -37,6 +38,7 @@ def validate_non_zero_tables(spark: SparkSession):
         GOLD_FX_TRENDS,
         GOLD_MACRO_TRENDS,
         GOLD_CROSS_SIGNALS,
+        GOLD_TOP_MOVERS_WHY,
     ]
     for table in tables:
         count = scalar(spark, f"SELECT COUNT(*) FROM {table}")
@@ -138,10 +140,15 @@ def validate_gold_metrics(spark: SparkSession):
         spark,
         f"SELECT COUNT(*) FROM {GOLD_CROSS_SIGNALS} WHERE risk_regime IS NULL",
     )
+    movers_missing = scalar(
+        spark,
+        f"SELECT COUNT(*) FROM {GOLD_TOP_MOVERS_WHY} WHERE why_summary IS NULL OR fx_context IS NULL OR macro_context IS NULL",
+    )
 
     require(market_missing == 0, "Validation failed: market Gold metrics are missing on one or more rows.")
     require(fx_missing == 0, "Validation failed: FX Gold metrics are missing on one or more rows.")
     require(cross_missing == 0, "Validation failed: cross-signal risk_regime is missing.")
+    require(movers_missing == 0, "Validation failed: top movers context fields are missing.")
 
 
 def run_validations(spark: SparkSession):
@@ -153,8 +160,8 @@ def run_validations(spark: SparkSession):
 
     summary = {
         "status": "SUCCESS",
-        "validated_tables": 10,
-        "message": "All Bronze, Silver, and Gold validation checks passed.",
+        "validated_tables": 11,
+        "message": "All Bronze, Silver, and Gold validation checks passed, including top movers context.",
     }
 
     log_pipeline_run(

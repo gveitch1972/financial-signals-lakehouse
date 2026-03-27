@@ -72,6 +72,7 @@ Currently active in the gold runner:
 - `fx_trend_signals`
 - `macro_indicator_trends`
 - `cross_signal_summary`
+- `top_movers_why`
 
 ## Catalog And Schemas
 
@@ -127,6 +128,7 @@ Current audit implementation:
 
 - writer: `src/common/audit.py`
 - main table used in code: `fin_signals_dev.audit.pipeline_runs`
+- current coverage: Bronze, Silver, Gold orchestration/sub-stages, and validation
 
 The audit layer is part of the operational control plane and should not be merged into Bronze, Silver, or Gold schemas.
 
