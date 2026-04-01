@@ -102,16 +102,17 @@ def validate_gold_metrics(spark: SparkSession):
         f"""
         WITH latest_market AS (
             SELECT *,
-                   row_number() OVER (PARTITION BY symbol ORDER BY snapshot_date DESC) AS rn
+                   row_number() OVER (PARTITION BY symbol ORDER BY snapshot_date DESC) AS rn,
+                   count(*) OVER (PARTITION BY symbol) AS symbol_history_count
             FROM {GOLD_MARKET_SNAPSHOT}
         )
         SELECT COUNT(*) FROM latest_market
         WHERE rn = 1
           AND (
-              return_7d_pct IS NULL
-              OR return_30d_pct IS NULL
-              OR return_90d_pct IS NULL
-              OR rolling_30d_volatility IS NULL
+              (symbol_history_count >= 8 AND return_7d_pct IS NULL)
+              OR (symbol_history_count >= 31 AND return_30d_pct IS NULL)
+              OR (symbol_history_count >= 91 AND return_90d_pct IS NULL)
+              OR (symbol_history_count >= 31 AND rolling_30d_volatility IS NULL)
               OR drawdown_from_90d_high_pct IS NULL
           )
         """,

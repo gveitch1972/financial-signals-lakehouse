@@ -95,6 +95,27 @@ def fetch_text(url, params):
     return response.text
 
 
+def compact_date(date_str):
+    return date_str.replace("-", "")
+
+
+def candidate_history_symbols(symbol):
+    lowered = symbol.lower().strip()
+    candidates = [lowered]
+    if lowered.endswith(".us"):
+        candidates.append(lowered[:-3])
+    if "." in lowered:
+        candidates.append(lowered.split(".", 1)[0])
+
+    unique = []
+    seen = set()
+    for value in candidates:
+        if value and value not in seen:
+            seen.add(value)
+            unique.append(value)
+    return unique
+
+
 def read_csv_text(spark, csv_text, schema):
     lines = [line for line in csv_text.splitlines() if line.strip()]
     if not lines:
@@ -174,7 +195,7 @@ def fetch_snapshot_for_symbol(spark, symbol):
     }
     csv_text = fetch_text(STOOQ_SNAPSHOT_URL, params)
     if "No data" in csv_text or len(csv_text.strip().splitlines()) <= 1:
-        print(f"No history data for {symbol}")
+        print(f"No snapshot data for {symbol}")
         return empty_market_df(spark)
 
     df = read_csv_text(spark, csv_text, snapshot_schema)
@@ -194,51 +215,126 @@ def fetch_snapshot_market_data(spark, symbols):
 
 
 def fetch_history_for_symbol(spark, symbol, start_date, end_date):
-    params = {"s": symbol.lower(), "i": "d"}
-    csv_text = fetch_text(STOOQ_HISTORY_URL, params)
-    history = read_csv_text(spark, csv_text, history_schema)
+    formatted_start = compact_date(start_date)
+    formatted_end = compact_date(end_date)
+    attempts = []
 
-    print(f"Fetching history for {symbol}")
-    print(f"Rows returned: {history.count()}")
+    for source_symbol in candidate_history_symbols(symbol):
+        params = {
+            "s": source_symbol,
+            "i": "d",
+            "d1": formatted_start,
+            "d2": formatted_end,
+        }
+        csv_text = fetch_text(STOOQ_HISTORY_URL, params)
+        history = read_csv_text(spark, csv_text, history_schema)
+        row_count = history.count()
+        attempts.append(f"{source_symbol}:{row_count}")
+
+        print(f"Fetching history for {symbol} via {source_symbol}")
+        print(f"Rows returned: {row_count}")
+
+        if row_count == 0:
+            lines = [line for line in csv_text.splitlines() if line.strip()]
+            if "No data" in csv_text:
+                print(f"Backfill source reported 'No data' for {source_symbol}")
+            elif len(lines) <= 1:
+                print(f"Backfill source returned header-only payload for {source_symbol}")
+            else:
+                print(f"Backfill source returned unparseable payload for {source_symbol}")
+            continue
+
+        return (
+            history.withColumn("symbol", F.lit(symbol.upper()))
+            .withColumn("price", F.col("Close"))
+            .withColumn("currency", F.split(F.col("symbol"), r"\.").getItem(1))
+            .withColumn("market_date", F.to_date(F.col("Date"), "yyyy-MM-dd"))
+            .filter(F.col("market_date").between(F.lit(start_date), F.lit(end_date)))
+            .withColumn("market_time", F.to_timestamp(F.col("Date"), "yyyy-MM-dd"))
+            .withColumn("ingested_at", F.current_timestamp())
+            .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
+            .withColumn("_source", F.lit("stooq_backfill"))
+            .select(
+                "symbol",
+                "price",
+                "currency",
+                "market_time",
+                "ingested_at",
+                "_ingest_date",
+                "_source",
+            ),
+            {
+                "symbol": symbol,
+                "status": "ok",
+                "source_symbol": source_symbol,
+                "rows": row_count,
+                "attempts": attempts,
+            },
+        )
+
+    print(f"No historical rows found for {symbol} across all symbol variants.")
+    snapshot_fallback = fetch_snapshot_for_symbol(spark, symbol).withColumn(
+        "_source", F.lit("stooq_backfill_snapshot_fallback")
+    )
+    if snapshot_fallback.take(1):
+        print(f"Using snapshot fallback for {symbol} in backfill mode.")
+        return (
+            snapshot_fallback,
+            {
+                "symbol": symbol,
+                "status": "snapshot_fallback",
+                "source_symbol": symbol.lower(),
+                "rows": 1,
+                "attempts": attempts,
+            },
+        )
 
     return (
-        history.withColumn("symbol", F.lit(symbol.upper()))
-        .withColumn("price", F.col("Close"))
-        .withColumn("currency", F.split(F.col("symbol"), r"\.").getItem(1))
-        .withColumn("market_date", F.to_date(F.col("Date"), "yyyy-MM-dd"))
-        .filter(F.col("market_date").between(F.lit(start_date), F.lit(end_date)))
-        .withColumn("market_time", F.to_timestamp(F.col("Date"), "yyyy-MM-dd"))
-        .withColumn("ingested_at", F.current_timestamp())
-        .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
-        .withColumn("_source", F.lit("stooq_backfill"))
-        .select(
-            "symbol",
-            "price",
-            "currency",
-            "market_time",
-            "ingested_at",
-            "_ingest_date",
-            "_source",
-        )
+        empty_market_df(spark),
+        {
+            "symbol": symbol,
+            "status": "empty",
+            "source_symbol": None,
+            "rows": 0,
+            "attempts": attempts,
+        },
     )
 
 
 def fetch_backfill_market_data(spark, symbols, start_date, end_date):
-    history_frames = [
+    history_results = [
         fetch_history_for_symbol(spark, symbol, start_date, end_date)
         for symbol in symbols
     ]
 
-    non_empty = [df for df in history_frames if df.take(1)]
+    summary_tokens = []
+    non_empty = []
+    for df, diagnostic in history_results:
+        if diagnostic["status"] == "ok":
+            summary_tokens.append(
+                f"{diagnostic['symbol']}=ok[{diagnostic['source_symbol']};rows={diagnostic['rows']}]"
+            )
+            non_empty.append(df)
+        elif diagnostic["status"] == "snapshot_fallback":
+            summary_tokens.append(
+                f"{diagnostic['symbol']}=snapshot_fallback[{diagnostic['source_symbol']};rows={diagnostic['rows']}]"
+            )
+            non_empty.append(df)
+        else:
+            attempted = ",".join(diagnostic["attempts"]) or "no-attempts"
+            summary_tokens.append(f"{diagnostic['symbol']}=empty[{attempted}]")
+
+    summary_line = "Backfill symbol summary: " + "; ".join(summary_tokens)
+    print(summary_line)
 
     if not non_empty:
-        return empty_market_df(spark)
+        return empty_market_df(spark), summary_line
 
     combined = non_empty[0]
     for df in non_empty[1:]:
         combined = combined.unionByName(df)
 
-    return combined
+    return combined, summary_line
 
 
 def safe_log_pipeline_run(spark, pipeline_name, status, row_count, message=None):
@@ -261,13 +357,19 @@ def main():
     start_date, end_date = get_date_range()
 
     try:
+        diagnostics = None
         if load_mode == "backfill":
-            df = fetch_backfill_market_data(spark, symbols, start_date, end_date)
+            df, diagnostics = fetch_backfill_market_data(
+                spark, symbols, start_date, end_date
+            )
         else:
             df = fetch_snapshot_market_data(spark, symbols)
 
         if df.rdd.isEmpty():
-            raise RuntimeError("Market ingestion returned zero rows.")
+            message = "Market ingestion returned zero rows."
+            if diagnostics:
+                message = f"{message} {diagnostics}"
+            raise RuntimeError(message)
 
         (df.write.format("delta").mode("append").saveAsTable(BRONZE_MARKET_RAW))
 
