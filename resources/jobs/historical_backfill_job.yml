@@ -5,31 +5,31 @@ resources:
 
       tasks:
         - task_key: bronze_price_backfill
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           spark_python_task:
             python_file: ../jobs/run_price_bronze_backfill.py
 
         - task_key: silver_price_transform
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: bronze_price_backfill
           spark_python_task:
             python_file: ../jobs/silver_market_prices.py
 
         - task_key: bronze_fx_backfill
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           spark_python_task:
             python_file: ../jobs/run_fx_bronze_backfill.py
 
         - task_key: silver_fx_transform
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: bronze_fx_backfill
           spark_python_task:
             python_file: ../jobs/run_silver_fx_clean.py
 
         - task_key: gold_analytics
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: silver_price_transform
             - task_key: silver_fx_transform
@@ -37,8 +37,21 @@ resources:
             python_file: ../jobs/run_gold_analytics.py
 
         - task_key: validation_queries
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: gold_analytics
           spark_python_task:
             python_file: ../jobs/run_99_validation_queries.py
+
+      job_clusters:
+        - job_cluster_key: single_node_cluster
+          new_cluster:
+            spark_version: 16.4.x-scala2.12
+            node_type_id: Standard_D4ds_v4
+            num_workers: 0
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              ResourceClass: SingleNode

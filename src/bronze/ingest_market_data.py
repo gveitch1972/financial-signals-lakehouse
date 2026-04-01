@@ -25,29 +25,36 @@ DEFAULT_MARKET_SYMBOLS = [
     "GLD.US",
     "TLT.US",
     "EFA.US",
+    "VIX.US",  # volatility
+    "DXY.US",  # dollar
+    "USO.US",  # oil
 ]
 DEFAULT_START_DATE = "2020-01-01"
 HTTP_HEADERS = {"User-Agent": "financial-signals-lakehouse/1.0"}
 
-snapshot_schema = StructType([
-    StructField("Symbol", StringType(), True),
-    StructField("Date", StringType(), True),
-    StructField("Time", StringType(), True),
-    StructField("Open", DoubleType(), True),
-    StructField("High", DoubleType(), True),
-    StructField("Low", DoubleType(), True),
-    StructField("Close", DoubleType(), True),
-    StructField("Volume", LongType(), True),
-])
+snapshot_schema = StructType(
+    [
+        StructField("Symbol", StringType(), True),
+        StructField("Date", StringType(), True),
+        StructField("Time", StringType(), True),
+        StructField("Open", DoubleType(), True),
+        StructField("High", DoubleType(), True),
+        StructField("Low", DoubleType(), True),
+        StructField("Close", DoubleType(), True),
+        StructField("Volume", LongType(), True),
+    ]
+)
 
-history_schema = StructType([
-    StructField("Date", StringType(), True),
-    StructField("Open", DoubleType(), True),
-    StructField("High", DoubleType(), True),
-    StructField("Low", DoubleType(), True),
-    StructField("Close", DoubleType(), True),
-    StructField("Volume", LongType(), True),
-])
+history_schema = StructType(
+    [
+        StructField("Date", StringType(), True),
+        StructField("Open", DoubleType(), True),
+        StructField("High", DoubleType(), True),
+        StructField("Low", DoubleType(), True),
+        StructField("Close", DoubleType(), True),
+        StructField("Volume", LongType(), True),
+    ]
+)
 
 
 def parse_csv_env(name, default_values):
@@ -66,7 +73,9 @@ def parse_csv_env(name, default_values):
 def get_load_mode():
     load_mode = os.getenv("LOAD_MODE", "snapshot").strip().lower()
     if load_mode not in {"snapshot", "backfill"}:
-        raise ValueError(f"Unsupported LOAD_MODE '{load_mode}'. Expected 'snapshot' or 'backfill'.")
+        raise ValueError(
+            f"Unsupported LOAD_MODE '{load_mode}'. Expected 'snapshot' or 'backfill'."
+        )
     return load_mode
 
 
@@ -74,7 +83,9 @@ def get_date_range():
     start_date = os.getenv("START_DATE", DEFAULT_START_DATE)
     end_date = os.getenv("END_DATE", date.today().isoformat())
     if start_date > end_date:
-        raise ValueError(f"START_DATE {start_date} must be on or before END_DATE {end_date}.")
+        raise ValueError(
+            f"START_DATE {start_date} must be on or before END_DATE {end_date}."
+        )
     return start_date, end_date
 
 
@@ -90,12 +101,7 @@ def read_csv_text(spark, csv_text, schema):
         return spark.createDataFrame([], schema)
 
     rdd = spark.sparkContext.parallelize(lines)
-    return (
-        spark.read
-        .option("header", True)
-        .schema(schema)
-        .csv(rdd)
-    )
+    return spark.read.option("header", True).schema(schema).csv(rdd)
 
 
 def standardize_market_frame(df, source_name):
@@ -106,19 +112,29 @@ def standardize_market_frame(df, source_name):
         .withColumn(
             "market_time",
             F.coalesce(
-                F.try_to_timestamp(F.concat_ws(" ", F.col("Date"), F.col("Time")), F.lit("yyyy-MM-dd HH:mm:ss")),
+                F.try_to_timestamp(
+                    F.concat_ws(" ", F.col("Date"), F.col("Time")),
+                    F.lit("yyyy-MM-dd HH:mm:ss"),
+                ),
                 F.try_to_timestamp(F.col("Date"), F.lit("yyyy-MM-dd")),
             ),
         )
         .withColumn("ingested_at", F.current_timestamp())
         .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
         .withColumn("_source", F.lit(source_name))
-        .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
+        .select(
+            "symbol",
+            "price",
+            "currency",
+            "market_time",
+            "ingested_at",
+            "_ingest_date",
+            "_source",
+        )
     )
 
     return (
-        standardized
-        .filter(F.col("symbol").isNotNull())
+        standardized.filter(F.col("symbol").isNotNull())
         .filter(F.col("price").isNotNull())
         .filter(F.col("market_time").isNotNull())
     )
@@ -127,15 +143,17 @@ def standardize_market_frame(df, source_name):
 def empty_market_df(spark):
     return spark.createDataFrame(
         [],
-        StructType([
-            StructField("symbol", StringType(), True),
-            StructField("price", DoubleType(), True),
-            StructField("currency", StringType(), True),
-            StructField("market_time", StringType(), True),
-            StructField("ingested_at", StringType(), True),
-            StructField("_ingest_date", StringType(), True),
-            StructField("_source", StringType(), True),
-        ]),
+        StructType(
+            [
+                StructField("symbol", StringType(), True),
+                StructField("price", DoubleType(), True),
+                StructField("currency", StringType(), True),
+                StructField("market_time", StringType(), True),
+                StructField("ingested_at", StringType(), True),
+                StructField("_ingest_date", StringType(), True),
+                StructField("_source", StringType(), True),
+            ]
+        ),
     ).select(
         F.col("symbol"),
         F.col("price"),
@@ -155,6 +173,10 @@ def fetch_snapshot_for_symbol(spark, symbol):
         "e": "csv",
     }
     csv_text = fetch_text(STOOQ_SNAPSHOT_URL, params)
+    if "No data" in csv_text or len(csv_text.strip().splitlines()) <= 1:
+        print(f"No history data for {symbol}")
+        return empty_market_df(spark)
+
     df = read_csv_text(spark, csv_text, snapshot_schema)
     return standardize_market_frame(df, "stooq_snapshot")
 
@@ -176,6 +198,9 @@ def fetch_history_for_symbol(spark, symbol, start_date, end_date):
     csv_text = fetch_text(STOOQ_HISTORY_URL, params)
     history = read_csv_text(spark, csv_text, history_schema)
 
+    print(f"Fetching history for {symbol}")
+    print(f"Rows returned: {history.count()}")
+
     return (
         history.withColumn("symbol", F.lit(symbol.upper()))
         .withColumn("price", F.col("Close"))
@@ -186,18 +211,33 @@ def fetch_history_for_symbol(spark, symbol, start_date, end_date):
         .withColumn("ingested_at", F.current_timestamp())
         .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
         .withColumn("_source", F.lit("stooq_backfill"))
-        .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
+        .select(
+            "symbol",
+            "price",
+            "currency",
+            "market_time",
+            "ingested_at",
+            "_ingest_date",
+            "_source",
+        )
     )
 
 
 def fetch_backfill_market_data(spark, symbols, start_date, end_date):
-    history_frames = [fetch_history_for_symbol(spark, symbol, start_date, end_date) for symbol in symbols]
-    if not history_frames:
+    history_frames = [
+        fetch_history_for_symbol(spark, symbol, start_date, end_date)
+        for symbol in symbols
+    ]
+
+    non_empty = [df for df in history_frames if df.take(1)]
+
+    if not non_empty:
         return empty_market_df(spark)
 
-    combined = history_frames[0]
-    for frame in history_frames[1:]:
-        combined = combined.unionByName(frame)
+    combined = non_empty[0]
+    for df in non_empty[1:]:
+        combined = combined.unionByName(df)
+
     return combined
 
 
@@ -229,12 +269,7 @@ def main():
         if df.rdd.isEmpty():
             raise RuntimeError("Market ingestion returned zero rows.")
 
-        (
-            df.write
-            .format("delta")
-            .mode("append")
-            .saveAsTable(BRONZE_MARKET_RAW)
-        )
+        (df.write.format("delta").mode("append").saveAsTable(BRONZE_MARKET_RAW))
 
         row_count = df.count()
         safe_log_pipeline_run(

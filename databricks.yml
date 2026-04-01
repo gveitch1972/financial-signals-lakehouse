@@ -18,6 +18,7 @@ variables:
 
 include:
   - resources/**/*.yml
+  - notebooks/**/*.yml
 
 sync:
   include:

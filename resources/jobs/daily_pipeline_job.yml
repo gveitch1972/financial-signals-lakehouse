@@ -1,47 +1,72 @@
 resources:
   jobs:
+
+    briefing_context_job:
+      name: briefing_context_job
+
+      tasks:
+        - task_key: build_briefing_context
+          existing_cluster_id: 0301-140106-2vpc0rse
+          notebook_task:
+            notebook_path: ../jobs/build_briefing_context.py
+            base_parameters:
+              include_heavy: "false"
+
+      job_clusters:
+        - job_cluster_key: single_node_cluster
+          new_cluster:
+            spark_version: 16.4.x-scala2.12
+            node_type_id: Standard_D4ds_v4
+            num_workers: 0
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              ResourceClass: SingleNode
+
     financial_signals_daily_pipeline:
       name: financial-signals-daily-pipeline
 
       tasks:
         - task_key: bronze_price_ingestion
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           spark_python_task:
             python_file: ../jobs/run_bronze_ingestion.py
 
         - task_key: silver_price_transform
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: bronze_price_ingestion
           spark_python_task:
             python_file: ../jobs/silver_market_prices.py
 
         - task_key: bronze_fx_ingestion
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           spark_python_task:
             python_file: ../jobs/run_fx_bronze_ingestion.py
 
         - task_key: silver_fx_transform
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: bronze_fx_ingestion
           spark_python_task:
             python_file: ../jobs/run_silver_fx_clean.py
 
         - task_key: bronze_macro_ingestion
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           spark_python_task:
             python_file: ../jobs/run_macro_bronze_ingestion.py
 
         - task_key: silver_macro_transform
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: bronze_macro_ingestion
           spark_python_task:
             python_file: ../jobs/run_silver_macro_clean.py
 
         - task_key: gold_analytics
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: silver_price_transform
             - task_key: silver_fx_transform
@@ -50,7 +75,7 @@ resources:
             python_file: ../jobs/run_gold_analytics.py
 
         - task_key: validation_queries
-          existing_cluster_id: 0301-140106-2vpc0rse
+          job_cluster_key: single_node_cluster
           depends_on:
             - task_key: gold_analytics
           spark_python_task:
