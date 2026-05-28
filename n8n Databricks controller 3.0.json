@@ -1,0 +1,622 @@
+{
+  "name": "n8n Databricks controller 3.0",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "poll",
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -464,
+        240
+      ],
+      "id": "7e850fbf-0f2a-490b-9927-33b0b44cff41",
+      "name": "Telegram Trigger",
+      "webhookId": "ac608ece-7081-4683-9bee-77d611db8a4e",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/run",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "69ab59ef-d056-468e-ae0b-1ae0c67c7051"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d0bddca3-b835-41ad-a4a5-066d579d0b78",
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "beaf904e-a859-4b5f-ae99-15583e42c33e",
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/list",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a486d520-6921-430d-b1ff-ed6955651d11",
+                    "leftValue": "={{$json.message.text}}",
+                    "rightValue": "/help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        192
+      ],
+      "id": "b17eb255-3635-4a50-be24-8923cda7dd58",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=🤖 <b>SignalDesk Control Bot</b>\n\n/run — trigger the daily pipeline\n/status — latest 5 run results\n/list — active runs\n/help — show this menu",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        528
+      ],
+      "id": "461f38c0-1bc2-41d6-900c-b6f3fb77b9c7",
+      "name": "/help",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=❓ Unknown command: <code>{{$json.message.text}}</code>\nTry /help",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        608
+      ],
+      "id": "00fca365-d805-477f-87a0-7ed832854ad4",
+      "name": "Default",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        608
+      ],
+      "id": "f3a97fff-6cea-472f-8a79-bad1972cfbb3",
+      "name": "Save chat_id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://adb-7405606401068884.4.azuredatabricks.net/api/2.1/jobs/run-now",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={\"job_id\": 906118710369467, \"chat_id\": {{ $json.chat_id }}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        192,
+        0
+      ],
+      "id": "6b919635-646c-4a8a-8983-96ddb6176a10",
+      "name": "Call dBricks Job",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NQEsdYMoR7kN4fgw",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://adb-7405606401068884.4.azuredatabricks.net/api/2.1/jobs/runs/list?limit=5",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        192,
+        192
+      ],
+      "id": "ef5ab3e5-09ce-49f9-8e8a-85727b0b8170",
+      "name": "Get Status",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NQEsdYMoR7kN4fgw",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Save Chat ID - Status').item.json.chat_id }}",
+        "text": "={{($json.runs||[]).length===0?'✅ No recent runs found':'📊 <b>Latest Runs</b>\\n\\n'+($json.runs||[]).slice(0,5).map(r=>{const code=(r.status&&r.status.termination_details&&r.status.termination_details.code)||'';const em=code==='SUCCESS'?'✅':code==='CANCELED'?'🚫':code==='TIMEDOUT'?'⏱️':code?'❌':'🔄';const name=(r.run_name||'Pipeline').replace('dev microsoft ','');return em+' <b>'+name+'</b>\\n<code>'+r.run_id+'</code> · '+(code||'IN PROGRESS');}).join('\\n\\n')}}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        192
+      ],
+      "id": "c3e12ac6-241f-4688-ade6-0a6a1a118e66",
+      "name": "Send Status",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "notesInFlow": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b49db51e-1403-410a-9a16-b12309345597",
+      "name": "Save Chat ID"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        192
+      ],
+      "id": "501c089b-f702-46a5-8129-b84a5ad69ef7",
+      "name": "Save Chat ID - Status"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        352
+      ],
+      "id": "d23bc9a8-ff56-4883-aca1-95b16adfa269",
+      "name": "Save Chat ID - List"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c24e82dd-0d11-49f0-b8a3-fa833d1d1a92",
+              "name": "chat_id",
+              "value": "={{$json.message.chat.id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        528
+      ],
+      "id": "779027d8-ffba-4551-a32c-992ae1ee466d",
+      "name": "Save Chat ID - Help"
+    },
+    {
+      "parameters": {
+        "url": "=https://adb-7405606401068884.4.azuredatabricks.net/api/2.1/jobs/runs/get?run_id={{ $json.run_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        368,
+        0
+      ],
+      "id": "e7f84dd0-501f-495a-931c-f605a26c6840",
+      "name": "Get Run ID",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NQEsdYMoR7kN4fgw",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Save Chat ID').item.json.chat_id }}",
+        "text": "=🚀 <b>Pipeline triggered</b>\nRun ID: <code>{{$json.run_id}}</code>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "d241006a-c561-46ed-bf57-83f267d8200e",
+      "name": "Send Run ID",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=🔍 Fetching runs... use /status for results.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        352
+      ],
+      "id": "173c7df1-4864-49a4-a1de-fbe83728d933",
+      "name": "Send Msg - PlaceH",
+      "webhookId": "5f278dc6-e031-4e42-9d5f-d51692d33d80",
+      "credentials": {
+        "telegramApi": {
+          "id": "ipiXMib6VZ2hClr7",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Save Chat ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Chat ID - Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Chat ID - List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Chat ID - Help",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save chat_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save chat_id": {
+      "main": [
+        [
+          {
+            "node": "Default",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call dBricks Job": {
+      "main": [
+        [
+          {
+            "node": "Get Run ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Status": {
+      "main": [
+        [
+          {
+            "node": "Send Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Chat ID": {
+      "main": [
+        [
+          {
+            "node": "Call dBricks Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Chat ID - Status": {
+      "main": [
+        [
+          {
+            "node": "Get Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Chat ID - List": {
+      "main": [
+        [
+          {
+            "node": "Send Msg - PlaceH",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Chat ID - Help": {
+      "main": [
+        [
+          {
+            "node": "/help",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Run ID": {
+      "main": [
+        [
+          {
+            "node": "Send Run ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "810cddee-8632-4abe-8522-72ac1bc52242",
+  "meta": {
+    "instanceId": "bb431a6c39b6e02007a843611b7ea88b66a22bc18c25b6cf440df2110554b560"
+  },
+  "id": "L0d27ZdzumiQoPlY",
+  "tags": []
+}
