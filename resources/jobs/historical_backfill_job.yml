@@ -6,6 +6,9 @@ resources:
       tasks:
         - task_key: bronze_price_backfill
           job_cluster_key: single_node_cluster
+          libraries:
+            - pypi:
+                package: yfinance
           spark_python_task:
             python_file: ../jobs/run_price_bronze_backfill.py
 

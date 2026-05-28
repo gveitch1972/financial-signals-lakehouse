@@ -1,3 +1,4 @@
 pyspark
 request
 feedparser
+yfinance

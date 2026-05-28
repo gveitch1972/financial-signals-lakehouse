@@ -32,6 +32,18 @@ DEFAULT_MARKET_SYMBOLS = [
 DEFAULT_START_DATE = "2020-01-01"
 HTTP_HEADERS = {"User-Agent": "financial-signals-lakehouse/1.0"}
 
+# Stooq symbols that don't map cleanly to Yahoo Finance tickers
+YFINANCE_SYMBOL_MAP = {
+    "VIX.US": "^VIX",
+    "DXY.US": "DX-Y.NYB",
+}
+
+
+def to_yfinance_ticker(symbol):
+    if symbol in YFINANCE_SYMBOL_MAP:
+        return YFINANCE_SYMBOL_MAP[symbol]
+    return symbol.split(".")[0].upper()
+
 snapshot_schema = StructType(
     [
         StructField("Symbol", StringType(), True),
@@ -87,6 +99,10 @@ def get_date_range():
             f"START_DATE {start_date} must be on or before END_DATE {end_date}."
         )
     return start_date, end_date
+
+
+def get_price_source():
+    return os.getenv("PRICE_SOURCE", "yfinance").strip().lower()
 
 
 def fetch_text(url, params):
@@ -186,7 +202,73 @@ def empty_market_df(spark):
     )
 
 
+def _fetch_snapshot_yfinance(spark, symbol):
+    import yfinance as yf
+
+    ticker = to_yfinance_ticker(symbol)
+    hist = yf.Ticker(ticker).history(period="5d")
+    if hist.empty:
+        print(f"No yfinance snapshot data for {ticker}")
+        return empty_market_df(spark)
+
+    row = hist.tail(1).reset_index()
+    row["Date"] = row["Date"].dt.strftime("%Y-%m-%d")
+    row["symbol"] = symbol.upper()
+    row["currency"] = symbol.split(".")[-1] if "." in symbol else "US"
+    pd_df = row[["symbol", "Close", "currency", "Date"]].rename(
+        columns={"Close": "price", "Date": "date_str"}
+    )
+    spark_df = spark.createDataFrame(pd_df)
+    return (
+        spark_df.withColumn("market_time", F.to_timestamp(F.col("date_str"), "yyyy-MM-dd"))
+        .withColumn("ingested_at", F.current_timestamp())
+        .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
+        .withColumn("_source", F.lit("yfinance_snapshot"))
+        .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
+    )
+
+
+def _fetch_history_yfinance(spark, symbol, start_date, end_date):
+    import yfinance as yf
+
+    ticker = to_yfinance_ticker(symbol)
+    print(f"Fetching history for {symbol} via yfinance ({ticker})")
+    hist = yf.Ticker(ticker).history(start=start_date, end=end_date)
+    if hist.empty:
+        print(f"No yfinance history data for {ticker}")
+        return (
+            empty_market_df(spark),
+            {"symbol": symbol, "status": "empty", "source_symbol": ticker, "rows": 0, "attempts": [ticker]},
+        )
+
+    hist = hist.reset_index()
+    hist["Date"] = hist["Date"].dt.strftime("%Y-%m-%d")
+    hist["symbol"] = symbol.upper()
+    hist["currency"] = symbol.split(".")[-1] if "." in symbol else "US"
+    pd_df = hist[["symbol", "Close", "currency", "Date"]].rename(
+        columns={"Close": "price", "Date": "date_str"}
+    )
+    row_count = len(pd_df)
+    print(f"Rows returned: {row_count}")
+
+    spark_df = spark.createDataFrame(pd_df)
+    result_df = (
+        spark_df.withColumn("market_time", F.to_timestamp(F.col("date_str"), "yyyy-MM-dd"))
+        .withColumn("ingested_at", F.current_timestamp())
+        .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
+        .withColumn("_source", F.lit("yfinance_backfill"))
+        .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
+    )
+    return (
+        result_df,
+        {"symbol": symbol, "status": "ok", "source_symbol": ticker, "rows": row_count, "attempts": [ticker]},
+    )
+
+
 def fetch_snapshot_for_symbol(spark, symbol):
+    if get_price_source() == "yfinance":
+        return _fetch_snapshot_yfinance(spark, symbol)
+
     params = {
         "s": symbol.lower(),
         "f": "sd2t2ohlcv",
@@ -215,6 +297,9 @@ def fetch_snapshot_market_data(spark, symbols):
 
 
 def fetch_history_for_symbol(spark, symbol, start_date, end_date):
+    if get_price_source() == "yfinance":
+        return _fetch_history_yfinance(spark, symbol, start_date, end_date)
+
     formatted_start = compact_date(start_date)
     formatted_end = compact_date(end_date)
     attempts = []
@@ -249,7 +334,11 @@ def fetch_history_for_symbol(spark, symbol, start_date, end_date):
             .withColumn("price", F.col("Close"))
             .withColumn("currency", F.split(F.col("symbol"), r"\.").getItem(1))
             .withColumn("market_date", F.to_date(F.col("Date"), "yyyy-MM-dd"))
-            .filter(F.col("market_date").between(F.lit(start_date), F.lit(end_date)))
+            .filter(
+                F.col("market_date").between(
+                    F.to_date(F.lit(start_date)), F.to_date(F.lit(end_date))
+                )
+            )
             .withColumn("market_time", F.to_timestamp(F.col("Date"), "yyyy-MM-dd"))
             .withColumn("ingested_at", F.current_timestamp())
             .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
