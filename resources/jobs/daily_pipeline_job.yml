@@ -29,7 +29,7 @@ resources:
       name: financial-signals-daily-pipeline
 
       schedule:
-        quartz_cron_expression: "0 30 6 * * ?"
+        quartz_cron_expression: "0 30 6 ? * MON-FRI"
         timezone_id: "UTC"
         pause_status: UNPAUSED
 
