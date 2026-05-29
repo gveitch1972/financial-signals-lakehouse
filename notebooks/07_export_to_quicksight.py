@@ -15,8 +15,8 @@ import os
 import json
 from datetime import date, timedelta
 
-AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "YOUR_ACCESS_KEY_ID")
-AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "YOUR_SECRET_ACCESS_KEY")
+AWS_ACCESS_KEY = dbutils.secrets.get("aws", "s3-writer-key-id")
+AWS_SECRET_KEY = dbutils.secrets.get("aws", "s3-writer-secret")
 BUCKET = "fin-signals-quicksight-313753089884"
 REGION = "eu-west-2"
 JSON_LOOKBACK_DAYS = 365  # cap dashboard JSON to last N days
@@ -78,7 +78,7 @@ export_json(trim_to_lookback(pdf_fx, "rate_date"), "dashboard/fx_trend_signals.j
 # COMMAND ----------
 
 pdf_cross = export_table("cross_signal_summary", "cross_signal_summary/data.parquet")
-export_json(trim_to_lookback(pdf_cross, "signal_date"), "dashboard/cross_signal_summary.json")
+export_json(trim_to_lookback(pdf_cross, "as_of_date"), "dashboard/cross_signal_summary.json")
 
 # COMMAND ----------
 

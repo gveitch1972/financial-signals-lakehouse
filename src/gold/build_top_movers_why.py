@@ -97,29 +97,23 @@ def build_top_movers_why_df(spark: SparkSession):
             F.col("return_30d_pct"),
             F.col("stress_flag"),
         )
-        .filter(F.col("return_30d_pct").isNotNull())
     )
 
-    up_window = Window.orderBy(
-        F.col("return_30d_pct").desc(),
-        F.col("day_change_pct").desc(),
-        F.col("symbol").asc(),
-    )
-    down_window = Window.orderBy(
-        F.col("return_30d_pct").asc(),
-        F.col("day_change_pct").asc(),
-        F.col("symbol").asc(),
-    )
+    # Use return_30d_pct when available, fall back to day_change_pct for day-1 symbols
+    rank_col = F.coalesce(F.col("return_30d_pct"), F.col("day_change_pct"))
+
+    up_window = Window.orderBy(rank_col.desc(), F.col("symbol").asc())
+    down_window = Window.orderBy(rank_col.asc(), F.col("symbol").asc())
 
     top_up = (
-        latest_market.filter(F.col("return_30d_pct") > 0)
+        latest_market.filter(rank_col > 0)
         .withColumn("_rank", F.row_number().over(up_window))
         .filter(F.col("_rank") <= F.lit(TOP_MOVERS_PER_DIRECTION))
         .drop("_rank")
     )
 
     top_down = (
-        latest_market.filter(F.col("return_30d_pct") < 0)
+        latest_market.filter(rank_col < 0)
         .withColumn("_rank", F.row_number().over(down_window))
         .filter(F.col("_rank") <= F.lit(TOP_MOVERS_PER_DIRECTION))
         .drop("_rank")
