@@ -23,8 +23,8 @@ from src.common.config import BRONZE_FX_RAW
 from src.common.audit import log_pipeline_run
 
 FX_API_BASE_URL = os.getenv("FX_API_BASE_URL", "https://api.frankfurter.app")
-DEFAULT_BASE_CURRENCY = "GBP"
-DEFAULT_QUOTE_CURRENCIES = ["USD", "EUR", "JPY", "CHF"]
+DEFAULT_BASE_CURRENCIES = ["GBP", "EUR", "USD"]
+DEFAULT_QUOTE_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD"]
 DEFAULT_START_DATE = "2020-01-01"
 DEFAULT_HTTP_TIMEOUT_SECONDS = int(os.getenv("FX_HTTP_TIMEOUT_SECONDS", "60"))
 DEFAULT_HTTP_MAX_RETRIES = int(os.getenv("FX_HTTP_MAX_RETRIES", "3"))
@@ -188,24 +188,34 @@ def main() -> None:
     run_id = str(uuid.uuid4())
     load_mode = get_load_mode()
     start_date, end_date = get_date_range()
-    base_currency = os.getenv("FX_BASE_CURRENCY", DEFAULT_BASE_CURRENCY).strip().upper()
+    base_currencies = parse_csv_env("FX_BASE_CURRENCIES", DEFAULT_BASE_CURRENCIES)
     quote_currencies = parse_csv_env("FX_QUOTE_CURRENCIES", DEFAULT_QUOTE_CURRENCIES)
-    request_url = build_request_url(load_mode, base_currency, quote_currencies, start_date, end_date)
     pipeline_name = f"bronze_fx_ingest_{load_mode}"
 
+    ensure_table_exists(spark)
+
+    all_rows = []
+    for base_currency in base_currencies:
+        quotes = [q for q in quote_currencies if q != base_currency]
+        request_url = build_request_url(load_mode, base_currency, quotes, start_date, end_date)
+        try:
+            payload = fetch_fx_payload(request_url)
+            rows = (
+                normalise_backfill_payload(payload, run_id, request_url)
+                if load_mode == "backfill"
+                else normalise_snapshot_payload(payload, run_id, request_url)
+            )
+            all_rows.extend(rows)
+            print(f"Fetched {len(rows)} rows for base={base_currency}")
+        except Exception as error:
+            print(f"WARNING: failed to fetch base={base_currency}: {error}")
+
+    if not all_rows:
+        safe_log_pipeline_run(spark, pipeline_name=pipeline_name, status="FAILED", row_count=0, message="All base currencies failed")
+        raise RuntimeError("FX ingestion returned zero rows across all base currencies.")
+
     try:
-        payload = fetch_fx_payload(request_url)
-        rows = (
-            normalise_backfill_payload(payload, run_id, request_url)
-            if load_mode == "backfill"
-            else normalise_snapshot_payload(payload, run_id, request_url)
-        )
-
-        if not rows:
-            raise RuntimeError("FX ingestion returned zero rows.")
-
-        df = spark.createDataFrame(rows, schema=FX_SCHEMA)
-        ensure_table_exists(spark)
+        df = spark.createDataFrame(all_rows, schema=FX_SCHEMA)
 
         (
             df.select(
@@ -230,12 +240,12 @@ def main() -> None:
             pipeline_name=pipeline_name,
             status="SUCCESS",
             row_count=row_count,
-            message=f"base={base_currency};quotes={','.join(quote_currencies)};start={start_date};end={end_date}",
+            message=f"bases={','.join(base_currencies)};quotes={','.join(quote_currencies)};start={start_date};end={end_date}",
         )
 
         print(
             f"Wrote {row_count} rows to {BRONZE_FX_RAW} "
-            f"with run_id={run_id}, mode={load_mode}, base={base_currency}, quotes={','.join(quote_currencies)}"
+            f"with run_id={run_id}, mode={load_mode}, bases={base_currencies}"
         )
     except Exception as error:
         safe_log_pipeline_run(

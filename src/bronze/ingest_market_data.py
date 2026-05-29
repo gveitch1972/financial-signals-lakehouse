@@ -19,15 +19,18 @@ from src.common.config import BRONZE_MARKET_RAW
 STOOQ_SNAPSHOT_URL = "https://stooq.com/q/l/"
 STOOQ_HISTORY_URL = "https://stooq.com/q/d/l/"
 DEFAULT_MARKET_SYMBOLS = [
-    "SPY.US",
-    "QQQ.US",
-    "IWM.US",
-    "GLD.US",
-    "TLT.US",
-    "EFA.US",
-    "VIX.US",  # volatility
-    "DXY.US",  # dollar
-    "USO.US",  # oil
+    # US indices / broad market
+    "SPY.US", "QQQ.US", "IWM.US",
+    # Mag-7
+    "AAPL.US", "MSFT.US", "NVDA.US", "AMZN.US", "GOOGL.US", "META.US", "TSLA.US",
+    # Sectors
+    "XLF.US", "XLE.US", "XLK.US", "XLV.US",
+    # International
+    "EFA.US", "EEM.US",
+    # Fixed income
+    "TLT.US", "HYG.US",
+    # Commodities / macro
+    "GLD.US", "SLV.US", "USO.US", "VIX.US", "DXY.US",
 ]
 DEFAULT_START_DATE = "2020-01-01"
 HTTP_HEADERS = {"User-Agent": "financial-signals-lakehouse/1.0"}

@@ -122,6 +122,72 @@ LOCATION 's3://fin-signals-quicksight-313753089884/daily_market_snapshot/';
 
 ---
 
+## Athena Tables — Additional Gold Tables
+
+Run these in Athena after exporting from Databricks:
+
+```sql
+CREATE EXTERNAL TABLE fx_trend_signals (
+  currency_pair          STRING,
+  rate_date              DATE,
+  base_currency          STRING,
+  quote_currency         STRING,
+  rate                   DOUBLE,
+  daily_change           DOUBLE,
+  daily_change_pct       DOUBLE,
+  weekly_change_pct      DOUBLE,
+  return_30d_pct         DOUBLE,
+  rolling_30d_volatility DOUBLE,
+  trend_signal           STRING,
+  stress_flag            BOOLEAN,
+  ingested_at            TIMESTAMP
+)
+STORED AS PARQUET
+LOCATION 's3://fin-signals-quicksight-313753089884/fx_trend_signals/';
+
+CREATE EXTERNAL TABLE cross_signal_summary (
+  signal_date            DATE,
+  stressed_equity_count  INT,
+  stressed_fx_count      INT,
+  equity_stress_pct      DOUBLE,
+  fx_stress_pct          DOUBLE,
+  risk_regime            STRING,
+  ingested_at            TIMESTAMP
+)
+STORED AS PARQUET
+LOCATION 's3://fin-signals-quicksight-313753089884/cross_signal_summary/';
+
+CREATE EXTERNAL TABLE macro_indicator_trends (
+  country_code           STRING,
+  indicator_name         STRING,
+  observation_date       DATE,
+  observation_value      DOUBLE,
+  period_change          DOUBLE,
+  period_change_pct      DOUBLE,
+  year_over_year_pct     DOUBLE,
+  trend_direction        STRING,
+  ingested_at            TIMESTAMP
+)
+STORED AS PARQUET
+LOCATION 's3://fin-signals-quicksight-313753089884/macro_indicator_trends/';
+
+CREATE EXTERNAL TABLE top_movers_why (
+  as_of_date             DATE,
+  symbol                 STRING,
+  latest_price           DOUBLE,
+  day_change_pct         DOUBLE,
+  return_30d_pct         DOUBLE,
+  stress_flag            BOOLEAN,
+  fx_context             STRING,
+  macro_context          STRING,
+  why_summary            STRING
+)
+STORED AS PARQUET
+LOCATION 's3://fin-signals-quicksight-313753089884/top_movers_why/';
+```
+
+---
+
 ## QuickSight Dataset
 
 Datasets → New dataset → Athena → workgroup: `primary` → database: `default` → table: `daily_market_snapshot` → Import to SPICE.
