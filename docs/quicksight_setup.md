@@ -146,13 +146,24 @@ STORED AS PARQUET
 LOCATION 's3://fin-signals-quicksight-313753089884/fx_trend_signals/';
 
 CREATE EXTERNAL TABLE cross_signal_summary (
-  signal_date            DATE,
-  stressed_equity_count  INT,
-  stressed_fx_count      INT,
-  equity_stress_pct      DOUBLE,
-  fx_stress_pct          DOUBLE,
-  risk_regime            STRING,
-  ingested_at            TIMESTAMP
+  as_of_date                   DATE,
+  market_symbols_count         BIGINT,
+  market_avg_day_change_pct    DOUBLE,
+  market_avg_return_30d_pct    DOUBLE,
+  market_avg_return_90d_pct    DOUBLE,
+  market_up_symbols            BIGINT,
+  market_down_symbols          BIGINT,
+  market_stress_symbols        BIGINT,
+  fx_strengthening_pairs       BIGINT,
+  fx_weakening_pairs           BIGINT,
+  fx_avg_daily_change_pct      DOUBLE,
+  fx_avg_return_30d_pct        DOUBLE,
+  fx_stress_pairs              BIGINT,
+  macro_up_indicators          BIGINT,
+  macro_down_indicators        BIGINT,
+  macro_avg_period_change_pct  DOUBLE,
+  macro_avg_year_over_year_pct DOUBLE,
+  risk_regime                  STRING
 )
 STORED AS PARQUET
 LOCATION 's3://fin-signals-quicksight-313753089884/cross_signal_summary/';
@@ -192,7 +203,7 @@ LOCATION 's3://fin-signals-quicksight-313753089884/top_movers_why/';
 
 Datasets → New dataset → Athena → workgroup: `primary` → database: `default` → table: `daily_market_snapshot` → Import to SPICE.
 
-**Note:** `daily_market_snapshot` is a current-state snapshot — one row per symbol per pipeline run. For time-series visuals, export `fx_trend_signals` instead.
+**Note:** `daily_market_snapshot` contains full history — one row per symbol per trading date. Use `snapshot_date` as the time axis for trend visuals.
 
 ---
 

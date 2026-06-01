@@ -31,7 +31,7 @@ def export_table(table_name: str, s3_key: str):
     tmp_path = f"/tmp/{table_name}.parquet"
     rows = spark.sql(f"SELECT * FROM fin_signals_dev.gold.{table_name}").collect()
     pdf = pd.DataFrame([r.asDict() for r in rows])
-    pdf.to_parquet(tmp_path)
+    pdf.to_parquet(tmp_path, index=False)
     get_s3().upload_file(tmp_path, BUCKET, s3_key)
     print(f"Uploaded {table_name} → s3://{BUCKET}/{s3_key}  ({len(pdf)} rows)")
     return pdf
