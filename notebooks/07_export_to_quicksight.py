@@ -5,7 +5,10 @@
 #   - IAM user: databricks-s3-writer (eu-west-2)
 #   - S3 bucket: fin-signals-quicksight-313753089884
 #   - Athena results bucket: fin-signals-athena-results-313753089884
-#   - Set AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in Databricks Secrets or env before running
+#   - Databricks secrets:
+#       aws/s3-writer-key-id, aws/s3-writer-secret
+#       aws/quicksight-account-id  (313753089884)
+#       aws/quicksight-dataset-id  (UUID from QuickSight dataset URL)
 
 # COMMAND ----------
 
@@ -23,6 +26,12 @@ JSON_LOOKBACK_DAYS = 365  # cap dashboard JSON to last N days
 
 def get_s3():
     return boto3.client('s3',
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY,
+        region_name=REGION)
+
+def get_quicksight():
+    return boto3.client('quicksight',
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_KEY,
         region_name=REGION)
@@ -65,6 +74,25 @@ def export_json(pdf: pd.DataFrame, s3_key: str):
     )
     print(f"Uploaded JSON → s3://{BUCKET}/{s3_key}  ({len(records)} records)")
 
+def refresh_quicksight_spice():
+    try:
+        account_id = dbutils.secrets.get("aws", "quicksight-account-id")
+        dataset_id = dbutils.secrets.get("aws", "quicksight-dataset-id")
+    except Exception:
+        print("QuickSight secrets not configured — skipping SPICE refresh")
+        return
+
+    ingestion_id = f"pipeline-{date.today().isoformat()}"
+    try:
+        resp = get_quicksight().create_ingestion(
+            AwsAccountId=account_id,
+            DataSetId=dataset_id,
+            IngestionId=ingestion_id,
+        )
+        print(f"QuickSight SPICE refresh triggered: ingestion_id={ingestion_id}  status={resp['IngestionStatus']}")
+    except Exception as e:
+        print(f"QuickSight SPICE refresh failed (non-fatal): {e}")
+
 # COMMAND ----------
 
 pdf_snapshot = export_table("daily_market_snapshot", "daily_market_snapshot/data.parquet")
@@ -88,3 +116,7 @@ export_table("macro_indicator_trends", "macro_indicator_trends/data.parquet")
 
 pdf_movers = export_table("top_movers_why", "top_movers_why/data.parquet")
 export_json(trim_to_lookback(pdf_movers, "as_of_date"), "dashboard/top_movers_why.json")
+
+# COMMAND ----------
+
+refresh_quicksight_spice()
