@@ -288,7 +288,11 @@ def fetch_snapshot_for_symbol(spark, symbol):
 
 
 def fetch_snapshot_market_data(spark, symbols):
-    snapshot_frames = [fetch_snapshot_for_symbol(spark, symbol) for symbol in symbols]
+    import time
+    snapshot_frames = []
+    for symbol in symbols:
+        snapshot_frames.append(fetch_snapshot_for_symbol(spark, symbol))
+        time.sleep(0.5)
     non_empty_frames = [frame for frame in snapshot_frames if frame.take(1)]
     if not non_empty_frames:
         return empty_market_df(spark)
