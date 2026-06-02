@@ -25,10 +25,7 @@ The repo is beyond bootstrap stage. The daily job defined in `resources/jobs/dai
 8. Validation queries
 9. Export to S3 (JSON for the React dashboard)
 
-There are two important implementation notes:
-
-- Market and FX Bronze now support both `snapshot` and `backfill` modes through runtime env vars.
-- A separate historical backfill job is available for one-time history loading before daily refreshes take over.
+Bronze ingestion supports `snapshot` (daily) and `backfill` modes via `LOAD_MODE` env var. A separate historical backfill job handles one-time deep history loading. Validation covers freshness, duplicates, history depth, and Gold output row counts — macro indicators use lower-frequency thresholds appropriate for annual World Bank data.
 
 ## Architecture
 
@@ -70,12 +67,6 @@ These integrations are lightweight and intended for demonstration and portfolio-
 5. Review validation output and audit tables
 
 The bundle entrypoint is `databricks.yml`. The main orchestrated workflow is `resources/jobs/daily_pipeline_job.yml`.
-
-## Reality Checks
-
-- Some SQL, notebook, and documentation assets are still thinner than the Python pipeline code.
-- Validation now performs freshness, duplicate, history-depth, and Gold output checks, with macro freshness and history depth evaluated using lower-frequency thresholds suitable for annual public indicators.
-- If you change Silver or Gold behavior, update orchestration, docs, and any relevant DDL in the same change.
 
 ## Companion Projects
 
