@@ -13,7 +13,7 @@ Databricks Asset Bundles project for a market + FX + macro risk intelligence pla
 
 ## Current State
 
-The repo is beyond bootstrap stage. The daily job defined in `resources/jobs/daily_pipeline_job.yml` currently runs:
+The repo is beyond bootstrap stage. The daily job defined in `resources/jobs/daily_pipeline_job.yml` runs at 06:30 UTC Mon–Fri:
 
 1. Price Bronze ingest
 2. Price Silver transform
@@ -22,7 +22,8 @@ The repo is beyond bootstrap stage. The daily job defined in `resources/jobs/dai
 5. Macro Bronze ingest
 6. Macro Silver transform
 7. Gold analytics
-8. Validation step
+8. Validation queries
+9. Export to S3 (JSON for the React dashboard)
 
 There are two important implementation notes:
 
@@ -42,7 +43,7 @@ Core naming is centralized in `src/common/config.py` and should be treated as th
 
 ## Public Data Sources
 
-- Market prices: Stooq CSV endpoint
+- Market prices: yfinance (Yahoo Finance) — 23 symbols including SPY, QQQ, Mag-7, sectors, commodities, DXY. Set `PRICE_SOURCE=stooq` to use Stooq instead (note: Stooq hard-caps at 5 rows).
 - FX rates: Frankfurter public FX API
 - Macro indicators: World Bank Indicators API
 
@@ -75,6 +76,12 @@ The bundle entrypoint is `databricks.yml`. The main orchestrated workflow is `re
 - Some SQL, notebook, and documentation assets are still thinner than the Python pipeline code.
 - Validation now performs freshness, duplicate, history-depth, and Gold output checks, with macro freshness and history depth evaluated using lower-frequency thresholds suitable for annual public indicators.
 - If you change Silver or Gold behavior, update orchestration, docs, and any relevant DDL in the same change.
+
+## Companion Projects
+
+- **[financial-signals-dashboard](https://github.com/gveitch1972/financial-signals-dashboard)** — React/Vite SPA deployed at [quicksight.grahamveitch.com](https://quicksight.grahamveitch.com). Consumes the S3 JSON exports from step 9 above.
+- **Power BI** — `powerbi/` folder contains a .pbix report connecting directly to the Gold tables via the Databricks native connector. Setup in `powerbi/setup.md`.
+- **n8n Telegram bot** — `n8n Databricks controller 3.0.json` — trigger pipeline runs and check job status via Telegram commands (`/run`, `/status`, `/list`, `/help`). Uses Header Auth against the Databricks Jobs API.
 
 ## Documentation
 
