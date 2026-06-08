@@ -34,6 +34,13 @@ DEFAULT_MARKET_SYMBOLS = [
 ]
 DEFAULT_START_DATE = "2020-01-01"
 HTTP_HEADERS = {"User-Agent": "financial-signals-lakehouse/1.0"}
+YFINANCE_TIMEOUT_SECONDS = int(os.getenv("YFINANCE_TIMEOUT_SECONDS", "30"))
+
+
+class _TimeoutSession(requests.Session):
+    def request(self, *args, **kwargs):
+        kwargs.setdefault("timeout", YFINANCE_TIMEOUT_SECONDS)
+        return super().request(*args, **kwargs)
 
 # Stooq symbols that don't map cleanly to Yahoo Finance tickers
 YFINANCE_SYMBOL_MAP = {
@@ -209,7 +216,7 @@ def _fetch_snapshot_yfinance(spark, symbol):
     import yfinance as yf
 
     ticker = to_yfinance_ticker(symbol)
-    hist = yf.Ticker(ticker).history(period="5d")
+    hist = yf.Ticker(ticker, session=_TimeoutSession()).history(period="5d")
     if hist.empty:
         print(f"No yfinance snapshot data for {ticker}")
         return empty_market_df(spark)
@@ -236,7 +243,7 @@ def _fetch_history_yfinance(spark, symbol, start_date, end_date):
 
     ticker = to_yfinance_ticker(symbol)
     print(f"Fetching history for {symbol} via yfinance ({ticker})")
-    hist = yf.Ticker(ticker).history(start=start_date, end=end_date)
+    hist = yf.Ticker(ticker, session=_TimeoutSession()).history(start=start_date, end=end_date)
     if hist.empty:
         print(f"No yfinance history data for {ticker}")
         return (
@@ -289,7 +296,7 @@ def fetch_snapshot_for_symbol(spark, symbol):
 
 def fetch_snapshot_market_data(spark, symbols):
     snapshot_frames = [fetch_snapshot_for_symbol(spark, symbol) for symbol in symbols]
-    non_empty_frames = [frame for frame in snapshot_frames if frame.take(1)]
+    non_empty_frames = [frame for frame in snapshot_frames if not frame.isEmpty()]
     if not non_empty_frames:
         return empty_market_df(spark)
 
