@@ -275,10 +275,7 @@ def _fetch_history_yfinance(spark, symbol, start_date, end_date):
     )
 
 
-def fetch_snapshot_for_symbol(spark, symbol):
-    if get_price_source() == "yfinance":
-        return _fetch_snapshot_yfinance(spark, symbol)
-
+def _fetch_snapshot_stooq(spark, symbol):
     params = {
         "s": symbol.lower(),
         "f": "sd2t2ohlcv",
@@ -292,6 +289,19 @@ def fetch_snapshot_for_symbol(spark, symbol):
 
     df = read_csv_text(spark, csv_text, snapshot_schema)
     return standardize_market_frame(df, "stooq_snapshot")
+
+
+def fetch_snapshot_for_symbol(spark, symbol):
+    if get_price_source() == "yfinance":
+        try:
+            return _fetch_snapshot_yfinance(spark, symbol)
+        except Exception as e:
+            if "RateLimit" in type(e).__name__:
+                print(f"[{symbol}] yfinance rate limited, falling back to Stooq snapshot")
+            else:
+                raise
+
+    return _fetch_snapshot_stooq(spark, symbol)
 
 
 def fetch_snapshot_market_data(spark, symbols):
