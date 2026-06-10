@@ -275,6 +275,55 @@ def _fetch_history_yfinance(spark, symbol, start_date, end_date):
     )
 
 
+def _fetch_history_finnhub(spark, symbol, start_date, end_date, api_key):
+    import json
+    import calendar
+    from urllib.request import Request, urlopen
+    from datetime import datetime, timezone
+
+    ticker = to_yfinance_ticker(symbol)
+    from_ts = int(calendar.timegm(datetime.strptime(start_date, "%Y-%m-%d").timetuple()))
+    to_ts = int(calendar.timegm(datetime.strptime(end_date, "%Y-%m-%d").timetuple())) + 86400
+
+    url = f"https://finnhub.io/api/v1/stock/candle?symbol={ticker}&resolution=D&from={from_ts}&to={to_ts}&token={api_key}"
+    req = Request(url, headers=HTTP_HEADERS)
+
+    print(f"Fetching history for {symbol} via finnhub ({ticker})")
+    with urlopen(req, timeout=30) as response:
+        data = json.loads(response.read().decode("utf-8"))
+
+    if data.get("s") != "ok" or not data.get("c"):
+        print(f"No finnhub history data for {ticker}")
+        return (
+            empty_market_df(spark),
+            {"symbol": symbol, "status": "empty", "source_symbol": ticker, "rows": 0, "attempts": [ticker]},
+        )
+
+    import pandas as pd
+    currency = symbol.split(".")[-1] if "." in symbol else "US"
+    pd_df = pd.DataFrame({
+        "symbol": symbol.upper(),
+        "price": data["c"],
+        "currency": currency,
+        "date_str": [datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y-%m-%d") for t in data["t"]],
+    })
+    row_count = len(pd_df)
+    print(f"Rows returned: {row_count}")
+
+    spark_df = spark.createDataFrame(pd_df)
+    result_df = (
+        spark_df.withColumn("market_time", F.to_timestamp(F.col("date_str"), "yyyy-MM-dd"))
+        .withColumn("ingested_at", F.current_timestamp())
+        .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
+        .withColumn("_source", F.lit("finnhub_backfill"))
+        .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
+    )
+    return (
+        result_df,
+        {"symbol": symbol, "status": "ok", "source_symbol": ticker, "rows": row_count, "attempts": [ticker]},
+    )
+
+
 def _get_finnhub_api_key(spark):
     key = os.getenv("FINNHUB_API_KEY")
     if key:
@@ -371,7 +420,9 @@ def fetch_snapshot_market_data(spark, symbols):
     return combined
 
 
-def fetch_history_for_symbol(spark, symbol, start_date, end_date):
+def fetch_history_for_symbol(spark, symbol, start_date, end_date, api_key=None):
+    if get_price_source() == "finnhub":
+        return _fetch_history_finnhub(spark, symbol, start_date, end_date, api_key)
     if get_price_source() == "yfinance":
         return _fetch_history_yfinance(spark, symbol, start_date, end_date)
 
@@ -466,8 +517,9 @@ def fetch_history_for_symbol(spark, symbol, start_date, end_date):
 
 
 def fetch_backfill_market_data(spark, symbols, start_date, end_date):
+    api_key = _get_finnhub_api_key(spark) if get_price_source() == "finnhub" else None
     history_results = [
-        fetch_history_for_symbol(spark, symbol, start_date, end_date)
+        fetch_history_for_symbol(spark, symbol, start_date, end_date, api_key=api_key)
         for symbol in symbols
     ]
 

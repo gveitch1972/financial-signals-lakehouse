@@ -14,8 +14,8 @@ if root not in sys.path:
     sys.path.insert(0, root)
 
 os.environ.setdefault("LOAD_MODE", "backfill")
-os.environ.setdefault("START_DATE", "2020-01-01")
-os.environ.setdefault("MARKET_SYMBOLS", "SPY.US,QQQ.US,IWM.US,GLD.US,TLT.US,EFA.US")
+os.environ.setdefault("START_DATE", "2026-06-09")
+os.environ.setdefault("END_DATE", "2026-06-09")
 
 from src.bronze.ingest_market_data import main
 
