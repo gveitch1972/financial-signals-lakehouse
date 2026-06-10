@@ -112,7 +112,7 @@ def get_date_range():
 
 
 def get_price_source():
-    return os.getenv("PRICE_SOURCE", "yfinance").strip().lower()
+    return os.getenv("PRICE_SOURCE", "finnhub").strip().lower()
 
 
 def fetch_text(url, params):
@@ -275,6 +275,55 @@ def _fetch_history_yfinance(spark, symbol, start_date, end_date):
     )
 
 
+def _get_finnhub_api_key(spark):
+    key = os.getenv("FINNHUB_API_KEY")
+    if key:
+        return key
+    try:
+        from pyspark.dbutils import DBUtils
+        return DBUtils(spark).secrets.get(scope="financial-signals", key="finnhub-api-key")
+    except Exception as e:
+        raise RuntimeError(f"finnhub API key unavailable: {e}")
+
+
+def _fetch_snapshot_finnhub(spark, symbol, api_key):
+    import json
+    from urllib.request import Request, urlopen
+    from datetime import datetime, timezone
+
+    ticker = to_yfinance_ticker(symbol)
+    url = f"https://finnhub.io/api/v1/quote?symbol={ticker}&token={api_key}"
+    req = Request(url, headers=HTTP_HEADERS)
+
+    with urlopen(req, timeout=30) as response:
+        data = json.loads(response.read().decode("utf-8"))
+
+    current_price = data.get("c")
+    timestamp = data.get("t")
+
+    if not current_price:
+        print(f"No finnhub data for {ticker}")
+        return empty_market_df(spark)
+
+    import pandas as pd
+    market_time = datetime.fromtimestamp(timestamp, tz=timezone.utc) if timestamp else datetime.now(timezone.utc)
+    pd_df = pd.DataFrame([{
+        "symbol": symbol.upper(),
+        "price": float(current_price),
+        "currency": symbol.split(".")[-1] if "." in symbol else "US",
+        "date_str": market_time.strftime("%Y-%m-%d"),
+    }])
+    spark_df = spark.createDataFrame(pd_df)
+    return (
+        spark_df
+        .withColumn("market_time", F.to_timestamp(F.col("date_str"), "yyyy-MM-dd"))
+        .withColumn("ingested_at", F.current_timestamp())
+        .withColumn("_ingest_date", F.to_date(F.current_timestamp()))
+        .withColumn("_source", F.lit("finnhub_snapshot"))
+        .select("symbol", "price", "currency", "market_time", "ingested_at", "_ingest_date", "_source")
+    )
+
+
 def _fetch_snapshot_stooq(spark, symbol):
     params = {
         "s": symbol.lower(),
@@ -291,21 +340,27 @@ def _fetch_snapshot_stooq(spark, symbol):
     return standardize_market_frame(df, "stooq_snapshot")
 
 
-def fetch_snapshot_for_symbol(spark, symbol):
-    if get_price_source() == "yfinance":
+def fetch_snapshot_for_symbol(spark, symbol, api_key=None):
+    source = get_price_source()
+
+    if source == "finnhub":
+        return _fetch_snapshot_finnhub(spark, symbol, api_key)
+
+    if source == "yfinance":
         try:
             return _fetch_snapshot_yfinance(spark, symbol)
         except Exception as e:
             if "RateLimit" in type(e).__name__:
-                print(f"[{symbol}] yfinance rate limited, falling back to Stooq snapshot")
-            else:
-                raise
+                print(f"[{symbol}] yfinance rate limited, falling back to finnhub")
+                return _fetch_snapshot_finnhub(spark, symbol, api_key)
+            raise
 
     return _fetch_snapshot_stooq(spark, symbol)
 
 
 def fetch_snapshot_market_data(spark, symbols):
-    snapshot_frames = [fetch_snapshot_for_symbol(spark, symbol) for symbol in symbols]
+    api_key = _get_finnhub_api_key(spark) if get_price_source() in {"finnhub", "yfinance"} else None
+    snapshot_frames = [fetch_snapshot_for_symbol(spark, symbol, api_key=api_key) for symbol in symbols]
     non_empty_frames = [frame for frame in snapshot_frames if not frame.isEmpty()]
     if not non_empty_frames:
         return empty_market_df(spark)
