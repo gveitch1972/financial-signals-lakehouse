@@ -112,5 +112,8 @@ resources:
             spark_conf:
               spark.databricks.cluster.profile: singleNode
               spark.master: local[*]
+            spark_env_vars:
+              MACRO_HTTP_TIMEOUT_SECONDS: "60"
+              MACRO_HTTP_MAX_RETRIES: "5"
             custom_tags:
               ResourceClass: SingleNode
